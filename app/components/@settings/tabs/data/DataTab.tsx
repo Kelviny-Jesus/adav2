@@ -6,13 +6,11 @@ import { db, getAll, deleteById } from '~/lib/persistence';
 
 export default function DataTab() {
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
-  const [isImportingKeys, setIsImportingKeys] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showResetInlineConfirm, setShowResetInlineConfirm] = useState(false);
   const [showDeleteInlineConfirm, setShowDeleteInlineConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const apiKeyFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportAllChats = async () => {
     try {
@@ -97,84 +95,6 @@ export default function DataTab() {
     }
   };
 
-  const handleImportAPIKeys = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    setIsImportingKeys(true);
-
-    try {
-      const content = await file.text();
-      const keys = JSON.parse(content);
-
-      // Validate and save each key
-      Object.entries(keys).forEach(([key, value]) => {
-        if (typeof value !== 'string') {
-          throw new Error(`Invalid value for key: ${key}`);
-        }
-
-        localStorage.setItem(`bolt_${key.toLowerCase()}`, value);
-      });
-
-      toast.success('API keys imported successfully');
-    } catch (error) {
-      console.error('Error importing API keys:', error);
-      toast.error('Failed to import API keys');
-    } finally {
-      setIsImportingKeys(false);
-
-      if (apiKeyFileInputRef.current) {
-        apiKeyFileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    setIsDownloadingTemplate(true);
-
-    try {
-      const template = {
-        Anthropic_API_KEY: '',
-        OpenAI_API_KEY: '',
-        Google_API_KEY: '',
-        Groq_API_KEY: '',
-        HuggingFace_API_KEY: '',
-        OpenRouter_API_KEY: '',
-        Deepseek_API_KEY: '',
-        Mistral_API_KEY: '',
-        OpenAILike_API_KEY: '',
-        Together_API_KEY: '',
-        xAI_API_KEY: '',
-        Perplexity_API_KEY: '',
-        Cohere_API_KEY: '',
-        AzureOpenAI_API_KEY: '',
-        OPENAI_LIKE_API_BASE_URL: '',
-        LMSTUDIO_API_BASE_URL: '',
-        OLLAMA_API_BASE_URL: '',
-        TOGETHER_API_BASE_URL: '',
-      };
-
-      const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'bolt-api-keys-template.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success('Template downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading template:', error);
-      toast.error('Failed to download template');
-    } finally {
-      setIsDownloadingTemplate(false);
-    }
-  };
 
   const handleResetSettings = async () => {
     setIsResetting(true);
@@ -395,58 +315,6 @@ export default function DataTab() {
         </div>
       </motion.div>
 
-      {/* API Keys Management Section */}
-      <motion.div
-        className="bg-white dark:bg-[#0A0A0A] rounded-lg p-6 border border-[#E5E5E5] dark:border-[#1A1A1A]"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <div className="i-ph:key-duotone w-5 h-5 text-purple-500" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">API Keys Management</h3>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Import API keys from a JSON file or download a template to fill in your keys.
-        </p>
-        <div className="flex gap-4">
-          <input
-            ref={apiKeyFileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportAPIKeys}
-            className="hidden"
-          />
-          <motion.button
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white text-sm hover:bg-purple-600"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleDownloadTemplate}
-            disabled={isDownloadingTemplate}
-          >
-            {isDownloadingTemplate ? (
-              <div className="i-ph:spinner-gap-bold animate-spin w-4 h-4" />
-            ) : (
-              <div className="i-ph:download-simple w-4 h-4" />
-            )}
-            Download Template
-          </motion.button>
-          <motion.button
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white text-sm hover:bg-purple-600"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => apiKeyFileInputRef.current?.click()}
-            disabled={isImportingKeys}
-          >
-            {isImportingKeys ? (
-              <div className="i-ph:spinner-gap-bold animate-spin w-4 h-4" />
-            ) : (
-              <div className="i-ph:upload-simple w-4 h-4" />
-            )}
-            Import API Keys
-          </motion.button>
-        </div>
-      </motion.div>
     </div>
   );
 }

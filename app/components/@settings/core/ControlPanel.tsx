@@ -72,8 +72,8 @@ const TAB_DESCRIPTIONS: Record<TabType, string> = {
   notifications: 'View and manage your notifications',
   features: 'Explore new and upcoming features',
   data: 'Manage your data and storage',
-  'cloud-providers': 'Configure cloud AI providers and models',
-  'local-providers': 'Configure local AI providers and models',
+  'cloud-providers': '', // Hidden feature
+  'local-providers': '', // Hidden feature
   'service-status': 'Monitor cloud LLM service status',
   connection: 'Check connection status and settings',
   debug: 'Debug tools and system information',
@@ -84,7 +84,7 @@ const TAB_DESCRIPTIONS: Record<TabType, string> = {
 };
 
 // Beta status for experimental features
-const BETA_TABS = new Set<TabType>(['task-manager', 'service-status', 'update', 'local-providers']);
+const BETA_TABS = new Set<TabType>(['task-manager', 'service-status', 'update']);
 
 const BetaLabel = () => (
   <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-blue-500/10 dark:bg-blue-900/10">
@@ -152,16 +152,38 @@ const AnimatedSwitch = ({ checked, onCheckedChange, id, label }: AnimatedSwitchP
   );
 };
 
+// Function to check if a user is an admin
+const isAdminUser = (user: any): boolean => {
+  if (!user) return false;
+  
+  // Check if the user has the admin role
+  return user.role === 'admin';
+};
+
 export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
   // State
   const [activeTab, setActiveTab] = useState<TabType | null>(null);
   const [loadingTab, setLoadingTab] = useState<TabType | null>(null);
   const [showTabManagement, setShowTabManagement] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Store values
   const tabConfiguration = useStore(tabConfigurationStore);
   const developerMode = useStore(developerModeStore);
   const profile = useStore(profileStore) as Profile;
+  
+  // Check if user is admin
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem("userData");
+      if (userData) {
+        const user = JSON.parse(userData);
+        setIsAdmin(isAdminUser(user));
+      }
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+    }
+  }, []);
 
   // Status hooks
   const { hasUpdate, currentVersion, acknowledgeUpdate } = useUpdateCheck();
@@ -231,6 +253,7 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         if (tab.id === 'notifications' && notificationsDisabled) {
           return false;
         }
+        
 
         return tab.visible && tab.window === 'user';
       })
@@ -319,10 +342,6 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         return <FeaturesTab />;
       case 'data':
         return <DataTab />;
-      case 'cloud-providers':
-        return <CloudProvidersTab />;
-      case 'local-providers':
-        return <LocalProvidersTab />;
       case 'connection':
         return <ConnectionsTab />;
       case 'debug':
@@ -335,6 +354,10 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         return <TaskManagerTab />;
       case 'service-status':
         return <ServiceStatusTab />;
+      case 'cloud-providers':
+        return <CloudProvidersTab />;
+      case 'local-providers':
+        return <LocalProvidersTab />;
       default:
         return null;
     }
@@ -465,15 +488,17 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
                   </div>
 
                   <div className="flex items-center gap-6">
-                    {/* Mode Toggle */}
-                    <div className="flex items-center gap-2 min-w-[140px] border-r border-gray-200 dark:border-gray-800 pr-6">
-                      <AnimatedSwitch
-                        id="developer-mode"
-                        checked={developerMode}
-                        onCheckedChange={handleDeveloperModeChange}
-                        label={developerMode ? 'Developer Mode' : 'User Mode'}
-                      />
-                    </div>
+                    {/* Mode Toggle - Only visible to admin users */}
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 min-w-[140px] border-r border-gray-200 dark:border-gray-800 pr-6">
+                        <AnimatedSwitch
+                          id="developer-mode"
+                          checked={developerMode}
+                          onCheckedChange={handleDeveloperModeChange}
+                          label={developerMode ? 'Developer Mode' : 'User Mode'}
+                        />
+                      </div>
+                    )}
 
                     {/* Avatar and Dropdown */}
                     <div className="border-l border-gray-200 dark:border-gray-800 pl-6">

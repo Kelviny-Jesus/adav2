@@ -1,18 +1,20 @@
-# bolt.diy (Previously oTToDev)
+# Ada
 
-[![bolt.diy: AI-Powered Full-Stack Web Development in the Browser](./public/social_preview_index.jpg)](https://bolt.diy)
+[![Ada: AI-Powered Full-Stack Web Development in the Browser](./public/social_preview_index.jpg)](https://Ada)
 
-Welcome to bolt.diy, the official open source version of Bolt.new (previously known as oTToDev and bolt.new ANY LLM), which allows you to choose the LLM that you use for each prompt! Currently, you can use OpenAI, Anthropic, Ollama, OpenRouter, Gemini, LMStudio, Mistral, xAI, HuggingFace, DeepSeek, or Groq models - and it is easily extended to use any other model supported by the Vercel AI SDK! See the instructions below for running this locally and extending it to include more models.
+Welcome to Ada, the official open source version of Ada.new (previously known as oTToDev and Ada.new ANY LLM), which allows you to choose the LLM that you use for each prompt! Currently, you can use OpenAI, Anthropic, Ollama, OpenRouter, Gemini, LMStudio, Mistral, xAI, HuggingFace, DeepSeek, or Groq models - and it is easily extended to use any other model supported by the Vercel AI SDK! See the instructions below for running this locally and extending it to include more models.
+
+This version includes enhanced authentication features, a modernized UI with Ada's visual identity, and improved provider management. The updated interface provides a seamless experience with gradient backgrounds, improved form elements, and consistent styling across all pages.
 
 -----
-Check the [bolt.diy Docs](https://stackblitz-labs.github.io/bolt.diy/) for more offical installation instructions and more informations.
+Check the [Ada Docs](https://stackblitz-labs.github.io/Ada/) for more offical installation instructions and more informations.
 
 -----
-Also [this pinned post in our community](https://thinktank.ottomator.ai/t/videos-tutorial-helpful-content/3243) has a bunch of incredible resources for running and deploying bolt.diy yourself!
+Also [this pinned post in our community](https://thinktank.ottomator.ai/t/videos-tutorial-helpful-content/3243) has a bunch of incredible resources for running and deploying Ada yourself!
 
-We have also launched an experimental agent called the "bolt.diy Expert" that can answer common questions about bolt.diy. Find it here on the [oTTomator Live Agent Studio](https://studio.ottomator.ai/).
+We have also launched an experimental agent called the "Ada Expert" that can answer common questions about Ada. Find it here on the [oTTomator Live Agent Studio](https://studio.ottomator.ai/).
 
-bolt.diy was originally started by [Cole Medin](https://www.youtube.com/@ColeMedin) but has quickly grown into a massive community effort to build the BEST open source AI coding assistant!
+Ada was originally started by [Cole Medin](https://www.youtube.com/@ColeMedin) but has quickly grown into a massive community effort to build the BEST open source AI coding assistant!
 
 ## Table of Contents
 
@@ -28,11 +30,11 @@ bolt.diy was originally started by [Cole Medin](https://www.youtube.com/@ColeMed
 
 ## Join the community
 
-[Join the bolt.diy community here, in the oTTomator Think Tank!](https://thinktank.ottomator.ai)
+[Join the Ada community here, in the oTTomator Think Tank!](https://thinktank.ottomator.ai)
 
 ## Project management
 
-Bolt.diy is a community effort! Still, the core team of contributors aims at organizing the project in way that allows
+Ada is a community effort! Still, the core team of contributors aims at organizing the project in way that allows
 you to understand where the current areas of focus are.
 
 If you want to know what we are working on, what we are planning to work on, or if you want to contribute to the
@@ -56,7 +58,7 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 - ✅ xAI Grok Beta Integration (@milutinke)
 - ✅ LM Studio Integration (@karrot0)
 - ✅ HuggingFace Integration (@ahsan3219)
-- ✅ Bolt terminal to see the output of LLM run commands (@thecodacus)
+- ✅ Ada terminal to see the output of LLM run commands (@thecodacus)
 - ✅ Streaming of code output (@thecodacus)
 - ✅ Ability to revert code to earlier version (@wonderwhy-er)
 - ✅ Chat history backup and restore functionality (@sidbetatester)
@@ -74,8 +76,8 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 - ✅ PromptLibrary to have different variations of prompts for different use cases (@thecodacus)
 - ✅ Detect package.json and commands to auto install & run preview for folder and git import (@wonderwhy-er)
 - ✅ Selection tool to target changes visually (@emcconnell)
-- ✅ Detect terminal Errors and ask bolt to fix it (@thecodacus)
-- ✅ Detect preview Errors and ask bolt to fix it (@wonderwhy-er)
+- ✅ Detect terminal Errors and ask Ada to fix it (@thecodacus)
+- ✅ Detect preview Errors and ask Ada to fix it (@wonderwhy-er)
 - ✅ Add Starter Template Options (@thecodacus)
 - ✅ Perplexity Integration (@meetpateltech)
 - ✅ AWS Bedrock Integration (@kunjabijukchhe)
@@ -98,6 +100,9 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 
 - **AI-powered full-stack web development** for **NodeJS based applications** directly in your browser.
 - **Support for multiple LLMs** with an extensible architecture to integrate additional models.
+- **Modern authentication system** with role-based access control for admin features.
+- **Beautiful UI with Ada's visual identity** featuring gradient backgrounds and consistent styling.
+- **Cloud and Local Provider management** for connecting to various AI services.
 - **Attach images to prompts** for better contextual understanding.
 - **Integrated terminal** to view output of LLM-run commands.
 - **Revert code to earlier versions** for easier debugging and quicker changes.
@@ -108,11 +113,11 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 
 If you're new to installing software from GitHub, don't worry! If you encounter any issues, feel free to submit an "issue" using the provided links or improve this documentation by forking the repository, editing the instructions, and submitting a pull request. The following instruction will help you get the stable branch up and running on your local machine in no time.
 
-Let's get you up and running with the stable version of Bolt.DIY!
+Let's get you up and running with the stable version of Ada!
 
 ## Quick Download
 
-[![Download Latest Release](https://img.shields.io/github/v/release/stackblitz-labs/bolt.diy?label=Download%20Bolt&sort=semver)](https://github.com/stackblitz-labs/bolt.diy/releases/latest) ← Click here to go the the latest release version!
+[![Download Latest Release](https://img.shields.io/github/v/release/stackblitz-labs/Ada?label=Download%20Ada&sort=semver)](https://github.com/stackblitz-labs/Ada/releases/latest) ← Click here to go the the latest release version!
 
 - Next **click source.zip**
 
@@ -143,7 +148,7 @@ Node.js is required to run the application.
 
 ## Running the Application
 
-You have two options for running Bolt.DIY: directly on your machine or using Docker.
+You have two options for running Ada: directly on your machine or using Docker. The application now includes authentication features, so you'll be able to create an account, log in, and access admin features if you have the appropriate role.
 
 ### Option 1: Direct Installation (Recommended for Beginners)
 
@@ -182,7 +187,7 @@ This option requires some familiarity with Docker but provides a more isolated e
    npm run dockerbuild
 
    # OR using direct Docker command:
-   docker build . --target bolt-ai-development
+   docker build . --target Ada-ai-development
    ```
 
 2. **Run the Container**:
@@ -194,12 +199,14 @@ This option requires some familiarity with Docker but provides a more isolated e
 
 ### Adding Your API Keys
 
-Setting up your API keys in Bolt.DIY is straightforward:
+Setting up your API keys in Ada is straightforward:
 
 1. Open the home page (main interface)
 2. Select your desired provider from the dropdown menu
 3. Click the pencil (edit) icon
 4. Enter your API key in the secure input field
+
+For admin users, additional configuration options are available in the Control Panel, accessible through the settings menu. Admin users can toggle between User Mode and Developer Mode to access advanced features.
 
 ![API Key Configuration Interface](./docs/images/api-key-ui-section.png)
 
@@ -208,12 +215,14 @@ Setting up your API keys in Bolt.DIY is straightforward:
 For providers that support custom base URLs (such as Ollama or LM Studio), follow these steps:
 
 1. Click the settings icon in the sidebar to open the settings menu
-   ![Settings Button Location](./docs/images/bolt-settings-button.png)
+   ![Settings Button Location](./docs/images/Ada-settings-button.png)
 
 2. Navigate to the "Providers" tab
 3. Search for your provider using the search bar
 4. Enter your custom base URL in the designated field
    ![Provider Base URL Configuration](./docs/images/provider-base-url.png)
+
+The Control Panel now features dedicated tabs for Cloud Providers and Local Providers, making it easier to manage your connections to different AI services.
 
 > **Note**: Custom base URLs are particularly useful when running local instances of AI models or using custom API endpoints.
 
@@ -222,6 +231,18 @@ For providers that support custom base URLs (such as Ollama or LM Studio), follo
 - Ollama
 - LM Studio
 - OpenAILike
+
+## Authentication System
+
+The new authentication system provides:
+
+1. **User Registration**: Create an account with your name, email, and password
+2. **Login**: Secure authentication with your credentials
+3. **Role-Based Access**: Admin users have access to additional features
+4. **Message Limits**: Non-registered users have limited access to the system
+5. **Password Recovery**: Reset your password if you forget it
+
+All authentication pages feature Ada's modern visual identity with gradient backgrounds, subtle animations, and consistent styling.
 
 ## Setup Using Git (For Developers only)
 

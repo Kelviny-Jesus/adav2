@@ -176,8 +176,6 @@ export function GithubConnection() {
       if (parsed.user && parsed.token) {
         fetchGitHubStats(parsed.token);
       }
-    } else if (import.meta.env.VITE_GITHUB_ACCESS_TOKEN) {
-      fetchGithubUser(import.meta.env.VITE_GITHUB_ACCESS_TOKEN);
     }
 
     setIsLoading(false);

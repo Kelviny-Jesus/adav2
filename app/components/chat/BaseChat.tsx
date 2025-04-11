@@ -4,6 +4,8 @@
  */
 import type { JSONValue, Message } from 'ai';
 import React, { type RefCallback, useEffect, useState } from 'react';
+// Authentication and message limit functionality
+import { useState as useAuthState, useEffect as useAuthEffect } from 'react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
@@ -36,6 +38,7 @@ import ProgressCompilation from './ProgressCompilation';
 import type { ProgressAnnotation } from '~/types/context';
 import type { ActionRunner } from '~/lib/runtime/action-runner';
 import { LOCAL_PROVIDERS } from '~/lib/stores/settings';
+import '~/lib/stores/auth-profile'; // Initialize profile from auth data
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -234,25 +237,103 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     };
 
-    const handleSendMessage = (event: React.UIEvent, messageInput?: string) => {
-      if (sendMessage) {
-        sendMessage(event, messageInput);
-
-        if (recognition) {
-          recognition.abort(); // Stop current recognition
-          setTranscript(''); // Clear transcript
-          setIsListening(false);
-
-          // Clear the input by triggering handleInputChange with empty value
-          if (handleInputChange) {
-            const syntheticEvent = {
-              target: { value: '' },
-            } as React.ChangeEvent<HTMLTextAreaElement>;
-            handleInputChange(syntheticEvent);
-          }
+  // Authentication state
+  interface User {
+    id: number;
+    name: string;
+    email: string;
+    created_at: string;
+  }
+  
+  const [user, setUser] = useAuthState<User | null>(null);
+  const [messageCount, setMessageCount] = useAuthState(0);
+  const [showLoginPrompt, setShowLoginPrompt] = useAuthState(false);
+  
+  // Check if user is authenticated
+  const isAuthenticated = !!user;
+  
+  // Load user data from localStorage on component mount
+  useAuthEffect(() => {
+    try {
+      const userData = localStorage.getItem("userData");
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+      
+      // Load message count for non-authenticated users
+      if (!isAuthenticated) {
+        const storedCount = localStorage.getItem("messageCount");
+        if (storedCount) {
+          setMessageCount(parseInt(storedCount, 10));
         }
       }
-    };
+    } catch (error) {
+      console.error("Error checking authentication:", error);
+    }
+  }, []);
+  
+  // Reset message count when user authenticates
+  useAuthEffect(() => {
+    if (isAuthenticated) {
+      setMessageCount(0);
+      localStorage.removeItem("messageCount");
+      setShowLoginPrompt(false);
+    }
+  }, [isAuthenticated]);
+  
+  // Check if user can send a message
+  const canSendMessage = isAuthenticated || messageCount < 1;
+  
+  // Increment message count for non-authenticated users
+  const incrementMessageCount = () => {
+    if (!isAuthenticated) {
+      const newCount = messageCount + 1;
+      setMessageCount(newCount);
+      localStorage.setItem("messageCount", newCount.toString());
+      
+      // Show login prompt if message limit is reached
+      if (newCount > 1) {
+        setShowLoginPrompt(true);
+      }
+    }
+  };
+  
+  // Close login prompt
+  const closeLoginPrompt = () => {
+    setShowLoginPrompt(false);
+  };
+
+  const handleSendMessage = (event: React.UIEvent, messageInput?: string) => {
+    // Check if user can send a message
+    if (!canSendMessage) {
+      // Show login prompt if message limit is reached
+      incrementMessageCount();
+      return;
+    }
+
+    // Increment message count for non-authenticated users
+    if (!isAuthenticated) {
+      incrementMessageCount();
+    }
+
+    if (sendMessage) {
+      sendMessage(event, messageInput);
+
+      if (recognition) {
+        recognition.abort(); // Stop current recognition
+        setTranscript(''); // Clear transcript
+        setIsListening(false);
+
+        // Clear the input by triggering handleInputChange with empty value
+        if (handleInputChange) {
+          const syntheticEvent = {
+            target: { value: '' }
+          } as React.ChangeEvent<HTMLTextAreaElement>;
+          handleInputChange(syntheticEvent);
+        }
+      }
+    }
+  };
 
     const handleFileUpload = () => {
       const input = document.createElement('input');
@@ -313,6 +394,52 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         data-chat-visible={showChat}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
+        
+        {/* Login prompt modal */}
+        {showLoginPrompt && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-[#0d1117] rounded-lg p-8 w-full max-w-md relative border border-gray-800">
+              <button 
+                onClick={closeLoginPrompt} 
+                className="absolute top-2 right-2 text-gray-400 hover:text-white"
+              >
+                <div className="i-ph:x text-xl"></div>
+              </button>
+              
+              <h2 className="text-2xl font-bold text-white mb-4">Message Limit Reached</h2>
+              
+              <p className="text-gray-300 mb-6">
+                You've reached the limit of messages for non-registered users. 
+                Sign in or create an account to continue using Ada without limitations.
+              </p>
+              
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={() => window.location.href = "/login"}
+                  className="w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md"
+                >
+                  Sign In
+                </button>
+                
+                <button
+                  onClick={() => window.location.href = "/register"}
+                  className="w-full bg-transparent hover:bg-gray-800 text-white border border-gray-700 py-2 rounded-md"
+                >
+                  Create Account
+                </button>
+                
+                <button
+                  onClick={closeLoginPrompt}
+                  className="w-full bg-transparent text-gray-400 hover:text-white py-2"
+                >
+                  Continue with Limited Access
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Login/logout button moved to bottom right */}
         <div ref={scrollRef} className="flex flex-col lg:flex-row overflow-y-auto w-full h-full">
           <div className={classNames(styles.Chat, 'flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full')}>
             {!chatStarted && (
@@ -398,36 +525,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   <rect className={classNames(styles.PromptEffectLine)} pathLength="100" strokeLinecap="round"></rect>
   <rect className={classNames(styles.PromptShine)} x="48" y="24" width="70" height="1"></rect>
 </svg>
-                  <div>
-                    <ClientOnly>
-                      {() => (
-                        <div className={isModelSettingsCollapsed ? 'hidden' : ''}>
-                          <ModelSelector
-                            key={provider?.name + ':' + modelList.length}
-                            model={model}
-                            setModel={setModel}
-                            modelList={modelList}
-                            provider={provider}
-                            setProvider={setProvider}
-                            providerList={providerList || (PROVIDER_LIST as ProviderInfo[])}
-                            apiKeys={apiKeys}
-                            modelLoading={isModelLoading}
-                          />
-                          {(providerList || []).length > 0 &&
-                            provider &&
-                            (!LOCAL_PROVIDERS.includes(provider.name) || 'OpenAILike') && (
-                              <APIKeyManager
-                                provider={provider}
-                                apiKey={apiKeys[provider.name] || ''}
-                                setApiKey={(key) => {
-                                  onApiKeysChange(provider.name, key);
-                                }}
-                              />
-                            )}
-                        </div>
-                      )}
-                    </ClientOnly>
-                  </div>
+                  {/* Model selector and API key manager are hidden as requested */}
                   <FilePreview
                     files={uploadedFiles}
                     imageDataList={imageDataList}
@@ -568,20 +666,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           disabled={isStreaming}
                         />
                         {chatStarted && <ClientOnly>{() => <ExportChatButton exportChat={exportChat} />}</ClientOnly>}
-                        <IconButton
-                          title="Model Settings"
-                          className={classNames('transition-all flex items-center gap-1', {
-                            'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent':
-                              isModelSettingsCollapsed,
-                            'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault':
-                              !isModelSettingsCollapsed,
-                          })}
-                          onClick={() => setIsModelSettingsCollapsed(!isModelSettingsCollapsed)}
-                          disabled={!providerList || providerList.length === 0}
-                        >
-                          <div className={`i-ph:caret-${isModelSettingsCollapsed ? 'right' : 'down'} text-lg`} />
-                          {isModelSettingsCollapsed ? <span className="text-xs">{model}</span> : <span />}
-                        </IconButton>
+                        {/* Model settings button hidden as requested */}
                       </div>
                       {input.length > 3 ? (
                         <div className="text-xs text-bolt-elements-textTertiary">
@@ -623,6 +708,36 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               />
             )}
           </ClientOnly>
+        </div>
+        
+        {/* Login/logout button at bottom right */}
+        <div className="fixed bottom-6 right-6 z-50">
+          {isAuthenticated ? (
+            <button
+              onClick={() => {
+                // Log out functionality
+                localStorage.removeItem("userData");
+                setUser(null);
+                setMessageCount(0);
+                localStorage.removeItem("messageCount");
+                // Also clear profile data
+                localStorage.removeItem("bolt_profile");
+                window.location.href = "/";
+              }}
+              className="bg-[#1a2b4c] hover:bg-[#1f3461] text-white px-4 py-2 rounded-md flex items-center gap-2 shadow-lg"
+            >
+              <div className="i-ph:arrow-right text-sm"></div>
+              <span>Logout</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => window.location.href = "/login"}
+              className="bg-[#1a2b4c] hover:bg-[#1f3461] text-white px-4 py-2 rounded-md flex items-center gap-2 shadow-lg"
+            >
+              <div className="i-ph:sign-in text-sm"></div>
+              <span>Login</span>
+            </button>
+          )}
         </div>
       </div>
     );
