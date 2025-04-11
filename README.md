@@ -7,30 +7,6 @@ Welcome to Ada, the official open source version of Ada.new (previously known as
 This version includes enhanced authentication features, a modernized UI with Ada's visual identity, and improved provider management. The updated interface provides a seamless experience with gradient backgrounds, improved form elements, and consistent styling across all pages.
 
 -----
-Check the [Ada Docs](https://stackblitz-labs.github.io/Ada/) for more offical installation instructions and more informations.
-
------
-Also [this pinned post in our community](https://thinktank.ottomator.ai/t/videos-tutorial-helpful-content/3243) has a bunch of incredible resources for running and deploying Ada yourself!
-
-We have also launched an experimental agent called the "Ada Expert" that can answer common questions about Ada. Find it here on the [oTTomator Live Agent Studio](https://studio.ottomator.ai/).
-
-Ada was originally started by [Cole Medin](https://www.youtube.com/@ColeMedin) but has quickly grown into a massive community effort to build the BEST open source AI coding assistant!
-
-## Table of Contents
-
-- [Join the Community](#join-the-community)
-- [Requested Additions](#requested-additions)
-- [Features](#features)
-- [Setup](#setup)
-- [Run the Application](#run-the-application)
-- [Available Scripts](#available-scripts)
-- [Contributing](#contributing)
-- [Roadmap](#roadmap)
-- [FAQ](#faq)
-
-## Join the community
-
-[Join the Ada community here, in the oTTomator Think Tank!](https://thinktank.ottomator.ai)
 
 ## Project management
 
@@ -47,12 +23,12 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 - ✅ Autogenerate Ollama models from what is downloaded (@yunatamos)
 - ✅ Filter models by provider (@jasonm23)
 - ✅ Download project as ZIP (@fabwaseem)
-- ✅ Improvements to the main bolt.new prompt in `app\lib\.server\llm\prompts.ts` (@kofi-bhr)
+- ✅ Improvements to the main Ada.new prompt in `app\lib\.server\llm\prompts.ts` (@kofi-bhr)
 - ✅ DeepSeek API Integration (@zenith110)
 - ✅ Mistral API Integration (@ArulGandhi)
 - ✅ "Open AI Like" API Integration (@ZerxZ)
 - ✅ Ability to sync files (one way sync) to local folder (@muzafferkadir)
-- ✅ Containerize the application with Docker for easy installation (@aaronbolton)
+- ✅ Containerize the application with Docker for easy installation (@aaronAdaon)
 - ✅ Publish projects directly to GitHub (@goncaloalves)
 - ✅ Ability to enter API keys in the UI (@ali00209)
 - ✅ xAI Grok Beta Integration (@milutinke)
@@ -82,7 +58,7 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 - ✅ Perplexity Integration (@meetpateltech)
 - ✅ AWS Bedrock Integration (@kunjabijukchhe)
 - ✅ Add a "Diff View" to see the changes (@toddyclipsgg)
-- ⬜ **HIGH PRIORITY** - Prevent bolt from rewriting files as often (file locking and diffs)
+- ⬜ **HIGH PRIORITY** - Prevent Ada from rewriting files as often (file locking and diffs)
 - ⬜ **HIGH PRIORITY** - Better prompting for smaller LLMs (code window sometimes doesn't start)
 - ⬜ **HIGH PRIORITY** - Run agents in the backend as opposed to a single model call
 - ⬜ Deploy directly to Vercel/Netlify/other similar platforms
@@ -114,12 +90,6 @@ project, please check the [project management guide](./PROJECT.md) to get starte
 If you're new to installing software from GitHub, don't worry! If you encounter any issues, feel free to submit an "issue" using the provided links or improve this documentation by forking the repository, editing the instructions, and submitting a pull request. The following instruction will help you get the stable branch up and running on your local machine in no time.
 
 Let's get you up and running with the stable version of Ada!
-
-## Quick Download
-
-[![Download Latest Release](https://img.shields.io/github/v/release/stackblitz-labs/Ada?label=Download%20Ada&sort=semver)](https://github.com/stackblitz-labs/Ada/releases/latest) ← Click here to go the the latest release version!
-
-- Next **click source.zip**
 
 ## Prerequisites
 
@@ -263,13 +233,13 @@ This method is recommended for developers who want to:
 
    ```bash
    # Using HTTPS
-   git clone https://github.com/stackblitz-labs/bolt.diy.git
+   git clone https://github.com/Kelviny-Jesus/adav2
    ```
 
 2. **Navigate to Project Directory**:
 
    ```bash
-   cd bolt.diy
+   cd Ada.diy
    ```
 
 3. **Switch to the Main Branch**:
