@@ -166,7 +166,7 @@ export default function RegisterPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
@@ -193,7 +193,7 @@ export default function RegisterPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? <EyeSlash size={18} /> : <Eye size={18} />}

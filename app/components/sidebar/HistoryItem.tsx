@@ -60,14 +60,31 @@ export function HistoryItem({ item, onDelete, onDuplicate, exportChat }: History
             )}
           >
             <div className="flex items-center gap-2.5 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
-              <ChatActionButton
-                toolTipContent="Export"
-                icon="i-ph:download-simple h-4 w-4"
-                onClick={(event) => {
-                  event.preventDefault();
-                  exportChat(item.id);
-                }}
-              />
+              {(() => {
+                // Only show export button for non-free users
+                const userData = localStorage.getItem("userData");
+                let userPlan = 'free';
+                if (userData) {
+                  try {
+                    const parsedUserData = JSON.parse(userData);
+                    userPlan = parsedUserData.plan?.toLowerCase() || 'free';
+                  } catch (error) {
+                    console.error("Error parsing user data:", error);
+                  }
+                }
+                
+                // Don't show export button for free users
+                return userPlan !== 'free' ? (
+                  <ChatActionButton
+                    toolTipContent="Export"
+                    icon="i-ph:download-simple h-4 w-4"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      exportChat(item.id);
+                    }}
+                  />
+                ) : null;
+              })()}
               {onDuplicate && (
                 <ChatActionButton
                   toolTipContent="Duplicate"

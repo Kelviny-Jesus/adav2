@@ -14,6 +14,7 @@ interface UserResponse {
   session_token: string;
   role?: string;
   plan_status?: string;
+  plan?: string;
 }
 
 export const action: ActionFunction = async ({ request }) => {
@@ -118,7 +119,8 @@ export default function LoginPage() {
         created_at: userData.created_at,
         session_token: userData.session_token,
         role: userData.role || 'user',
-        plan_status: userData.plan_status || 'active'
+        plan_status: userData.plan_status || 'active',
+        plan: userData.plan || 'free'
       };
 
       localStorage.setItem("userData", JSON.stringify(userDataForStorage));

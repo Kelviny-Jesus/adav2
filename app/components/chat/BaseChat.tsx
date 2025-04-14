@@ -4,8 +4,11 @@
  */
 import type { JSONValue, Message } from 'ai';
 import React, { type RefCallback, useEffect, useState } from 'react';
-// Authentication and message limit functionality
+// Authentication and limit functionality
 import { useState as useAuthState, useEffect as useAuthEffect } from 'react';
+import { useMessageLimit } from '../../../hooks/use-message-limit';
+import { useExportLimit } from '../../../hooks/use-export-limit';
+import SubscriptionPlansPopup from './SubscriptionPlansPopup';
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
@@ -243,11 +246,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     name: string;
     email: string;
     created_at: string;
+    role?: string;
+    plan?: string;
+    plan_status?: string;
   }
   
   const [user, setUser] = useAuthState<User | null>(null);
-  const [messageCount, setMessageCount] = useAuthState(0);
-  const [showLoginPrompt, setShowLoginPrompt] = useAuthState(false);
   
   // Check if user is authenticated
   const isAuthenticated = !!user;
@@ -259,61 +263,55 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       if (userData) {
         setUser(JSON.parse(userData));
       }
-      
-      // Load message count for non-authenticated users
-      if (!isAuthenticated) {
-        const storedCount = localStorage.getItem("messageCount");
-        if (storedCount) {
-          setMessageCount(parseInt(storedCount, 10));
-        }
-      }
     } catch (error) {
       console.error("Error checking authentication:", error);
     }
   }, []);
   
-  // Reset message count when user authenticates
-  useAuthEffect(() => {
-    if (isAuthenticated) {
-      setMessageCount(0);
-      localStorage.removeItem("messageCount");
-      setShowLoginPrompt(false);
-    }
-  }, [isAuthenticated]);
+  // Use the message and export limit hooks
+  const {
+    messageCount,
+    monthlyLimit: messageMonthlyLimit,
+    showLoginPrompt,
+    showSubscriptionPlans: showMessageSubscriptionPlans,
+    incrementMessageCount,
+    resetMessageCount,
+    closeLoginPrompt,
+    closeSubscriptionPlans: closeMessageSubscriptionPlans,
+    canSendMessage
+  } = useMessageLimit(isAuthenticated, user);
   
-  // Check if user can send a message
-  const canSendMessage = isAuthenticated || messageCount < 1;
+  // Use the export limit hook
+  const {
+    exportCount,
+    monthlyLimit: exportMonthlyLimit,
+    showSubscriptionPlans: showExportSubscriptionPlans,
+    incrementExportCount,
+    resetExportCount,
+    closeSubscriptionPlans: closeExportSubscriptionPlans,
+    canExport
+  } = useExportLimit(isAuthenticated, user);
   
-  // Increment message count for non-authenticated users
-  const incrementMessageCount = () => {
-    if (!isAuthenticated) {
-      const newCount = messageCount + 1;
-      setMessageCount(newCount);
-      localStorage.setItem("messageCount", newCount.toString());
-      
-      // Show login prompt if message limit is reached
-      if (newCount > 1) {
-        setShowLoginPrompt(true);
-      }
-    }
-  };
+  // Use only message subscription plans popup in BaseChat
+  const showSubscriptionPlans = showMessageSubscriptionPlans;
   
-  // Close login prompt
-  const closeLoginPrompt = () => {
-    setShowLoginPrompt(false);
+  // Close only message subscription plans popup in BaseChat
+  const closeSubscriptionPlans = () => {
+    closeMessageSubscriptionPlans();
   };
 
   const handleSendMessage = (event: React.UIEvent, messageInput?: string) => {
     // Check if user can send a message
     if (!canSendMessage) {
-      // Show login prompt if message limit is reached
+      // Show login prompt or subscription plans popup if message limit is reached
       incrementMessageCount();
       return;
     }
 
-    // Increment message count for non-authenticated users
-    if (!isAuthenticated) {
-      incrementMessageCount();
+    // Check if this message would exceed the limit
+    const canSend = incrementMessageCount();
+    if (!canSend) {
+      return;
     }
 
     if (sendMessage) {
@@ -395,6 +393,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
         
+        {/* Subscription plans popup */}
+        <SubscriptionPlansPopup 
+          isOpen={showSubscriptionPlans} 
+          onClose={closeSubscriptionPlans} 
+        />
+        
         {/* Login prompt modal */}
         {showLoginPrompt && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -409,8 +413,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               <h2 className="text-2xl font-bold text-white mb-4">Message Limit Reached</h2>
               
               <p className="text-gray-300 mb-6">
-                You've reached the limit of messages for non-registered users. 
-                Sign in or create an account to continue using Ada without limitations.
+                {isAuthenticated ? 
+                  `You've reached the limit of ${messageMonthlyLimit} messages for your current plan (${user?.plan || 'Free'}).
+                  Upgrade your plan to send more messages this month.` :
+                  `You've reached the limit of messages for non-registered users. 
+                  Sign in or create an account to continue using Ada without limitations.`
+                }
               </p>
               
               <div className="flex flex-col space-y-3">
@@ -665,7 +673,22 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           onStop={stopListening}
                           disabled={isStreaming}
                         />
-                        {chatStarted && <ClientOnly>{() => <ExportChatButton exportChat={exportChat} />}</ClientOnly>}
+                        {chatStarted && <ClientOnly>{() => {
+                          // Only show export button for non-free users
+                          const userData = localStorage.getItem("userData");
+                          let userPlan = 'free';
+                          if (userData) {
+                            try {
+                              const parsedUserData = JSON.parse(userData);
+                              userPlan = parsedUserData.plan?.toLowerCase() || 'free';
+                            } catch (error) {
+                              console.error("Error parsing user data:", error);
+                            }
+                          }
+                          
+                          // Don't show export button for free users
+                          return userPlan !== 'free' ? <ExportChatButton exportChat={exportChat} /> : null;
+                        }}</ClientOnly>}
                         {/* Model settings button hidden as requested */}
                       </div>
                       {input.length > 3 ? (
@@ -718,7 +741,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 // Log out functionality
                 localStorage.removeItem("userData");
                 setUser(null);
-                setMessageCount(0);
+                resetMessageCount();
                 localStorage.removeItem("messageCount");
                 // Also clear profile data
                 localStorage.removeItem("bolt_profile");

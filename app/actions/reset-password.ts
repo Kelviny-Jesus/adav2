@@ -84,6 +84,7 @@ export async function resetPassword(formData: FormData) {
   }
 
   try {
+    // Use the updated API endpoint for resetting password
     const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/reset/password", {
       method: "POST",
       headers: {
@@ -98,6 +99,59 @@ export async function resetPassword(formData: FormData) {
       return { success: true, message: "Password reset successfully" };
     } else {
       return { error: data.msg };
+    }
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    return { error: "Failed to reset password. Please try again." };
+  }
+}
+
+export async function resetPasswordWithCode(formData: FormData) {
+  const email = formData.get("email") as string;
+  const code = formData.get("code") as string;
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!email || !code || !password || !confirmPassword) {
+    return { error: "All fields are required" };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match" };
+  }
+
+  try {
+    // Step 1: Verify the code first
+    const verifyResponse = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/verify-reset-code", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, code }),
+    });
+
+    const verifyData: ApiResponse = await verifyResponse.json();
+    
+    // If code verification fails, return error
+    if (!verifyResponse.ok || !verifyData.status) {
+      return { error: verifyData.msg || "Invalid verification code. Please try again." };
+    }
+    
+    // Step 2: If code is verified, proceed with password reset using the updated API endpoint
+    const resetResponse = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/reset/password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const resetData: ApiResponse = await resetResponse.json();
+
+    if (resetResponse.ok && resetData.status) {
+      return { success: true, message: "Password reset successfully" };
+    } else {
+      return { error: resetData.msg || "Failed to reset password. Please try again." };
     }
   } catch (error) {
     console.error("Error resetting password:", error);

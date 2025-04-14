@@ -1,10 +1,8 @@
 # Ada
 
-Welcome to Ada, the official open source version of Ada.new (previously known as oTToDev and Ada.new ANY LLM), which allows you to choose the LLM that you use for each prompt! Currently, you can use OpenAI, Anthropic, Ollama, OpenRouter, Gemini, LMStudio, Mistral, xAI, HuggingFace, DeepSeek, or Groq models - and it is easily extended to use any other model supported by the Vercel AI SDK! See the instructions below for running this locally and extending it to include more models.
+Welcome to Ada, the official open source version of Ada, which allows you to choose the LLM that you use for each prompt! Currently, you can use OpenAI, Anthropic, Ollama, OpenRouter, Gemini, LMStudio, Mistral, xAI, HuggingFace, DeepSeek, or Groq models - and it is easily extended to use any other model supported by the Vercel AI SDK! See the instructions below for running this locally and extending it to include more models.
 
 This version includes enhanced authentication features, a modernized UI with Ada's visual identity, and improved provider management. The updated interface provides a seamless experience with gradient backgrounds, improved form elements, and consistent styling across all pages.
-
------
 
 ## Project management
 

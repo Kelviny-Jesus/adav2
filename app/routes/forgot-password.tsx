@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Form, useNavigate, Link } from "@remix-run/react";
 import { json } from "@remix-run/cloudflare";
 import type { ActionFunction } from "@remix-run/cloudflare";
+import VerificationCodePopup from "~/components/auth/VerificationCodePopup";
+import PasswordResetPopup from "~/components/auth/PasswordResetPopup";
 
 interface ApiResponse {
   status: boolean;
@@ -43,6 +45,8 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [showPasswordResetPopup, setShowPasswordResetPopup] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -64,6 +68,8 @@ export default function ForgotPasswordPage() {
 
       if (response.status === 201 && data.status) {
         setSuccess("Reset code sent successfully. Please check your email.");
+        // Show verification popup
+        setShowVerificationPopup(true);
       } else {
         setError(data.msg);
       }
@@ -73,6 +79,22 @@ export default function ForgotPasswordPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVerificationSuccess = () => {
+    // Close verification popup and open password reset popup
+    setShowVerificationPopup(false);
+    setShowPasswordResetPopup(true);
+  };
+
+  const handleResetSuccess = () => {
+    // Close password reset popup and show success message
+    setShowPasswordResetPopup(false);
+    setSuccess("Password reset successfully. You will be redirected to login.");
+    // Redirect to login page after a short delay
+    setTimeout(() => {
+      navigate("/login");
+    }, 3000);
   };
 
   return (
@@ -142,6 +164,15 @@ export default function ForgotPasswordPage() {
                   Sign in
                 </Link>
               </p>
+              <p className="mt-4 text-gray-400">
+                Already have a code?{" "}
+                <button 
+                  onClick={() => setShowVerificationPopup(true)} 
+                  className="text-gray-200 hover:text-white bg-transparent border-none p-0 cursor-pointer"
+                >
+                  Enter verification code
+                </button>
+              </p>
             </div>
           </div>
         </div>
@@ -152,6 +183,22 @@ export default function ForgotPasswordPage() {
           © {new Date().getFullYear()} Ada. All rights reserved.
         </div>
       </footer>
+
+      {/* Verification Code Popup */}
+      <VerificationCodePopup
+        isOpen={showVerificationPopup}
+        onClose={() => setShowVerificationPopup(false)}
+        email={email}
+        onVerifySuccess={handleVerificationSuccess}
+      />
+
+      {/* Password Reset Popup */}
+      <PasswordResetPopup
+        isOpen={showPasswordResetPopup}
+        onClose={() => setShowPasswordResetPopup(false)}
+        email={email}
+        onResetSuccess={handleResetSuccess}
+      />
     </div>
   );
 }

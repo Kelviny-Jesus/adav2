@@ -8,6 +8,9 @@ interface UserResponse {
   salt: string;
   created_at: string;
   session_token: string;
+  plan?: string;
+  plan_status?: string;
+  role?: string;
 }
 
 // Create a cookie instance
@@ -55,6 +58,9 @@ export async function loginUser(formData: FormData) {
       name: userData.name,
       email: userData.email,
       created_at: userData.created_at,
+      plan: userData.plan || 'free',
+      plan_status: userData.plan_status || 'active',
+      role: userData.role || 'user'
     };
 
     // Return the user data (excluding sensitive information)

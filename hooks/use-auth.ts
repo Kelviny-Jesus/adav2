@@ -5,6 +5,9 @@ interface User {
   name: string;
   email: string;
   created_at: string;
+  role?: string;
+  plan?: string;
+  plan_status?: string;
 }
 
 export function useAuth() {
@@ -17,7 +20,9 @@ export function useAuth() {
       try {
         const userData = localStorage.getItem("userData");
         if (userData) {
-          setUser(JSON.parse(userData));
+          const parsedUserData = JSON.parse(userData);
+          console.log("User data from localStorage:", parsedUserData);
+          setUser(parsedUserData);
         }
       } catch (error) {
         console.error("Error checking authentication:", error);

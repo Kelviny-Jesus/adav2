@@ -14,6 +14,7 @@ import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { classNames } from '~/utils/classNames';
 import { useStore } from '@nanostores/react';
 import { profileStore } from '~/lib/stores/profile';
+import SubscriptionPlanIndicator from './SubscriptionPlanIndicator';
 
 const menuVariants = {
   closed: {
@@ -67,6 +68,7 @@ export const Menu = () => {
   const [open, setOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPlansPopupOpen, setIsPlansPopupOpen] = useState(false);
   const profile = useStore(profileStore);
 
   const { filteredItems: filteredList, handleSearchChange } = useSearchFilter({
@@ -118,7 +120,8 @@ export const Menu = () => {
     const exitThreshold = 40;
 
     function onMouseMove(event: MouseEvent) {
-      if (isSettingsOpen) {
+      // Don't close the sidebar if settings or plans popup is open
+      if (isSettingsOpen || isPlansPopupOpen) {
         return;
       }
 
@@ -136,7 +139,7 @@ export const Menu = () => {
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
     };
-  }, [isSettingsOpen]);
+  }, [isSettingsOpen, isPlansPopupOpen]);
 
   const handleDeleteClick = (event: React.UIEvent, item: ChatHistoryItem) => {
     event.preventDefault();
@@ -162,7 +165,7 @@ export const Menu = () => {
       <motion.div
         ref={menuRef}
         initial="closed"
-        animate={open ? 'open' : 'closed'}
+        animate={(open || isPlansPopupOpen) ? 'open' : 'closed'}
         variants={menuVariants}
         style={{ width: '340px' }}
         className={classNames(
@@ -278,6 +281,12 @@ export const Menu = () => {
           </div>
           <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 px-4 py-3">
             <SettingsButton onClick={handleSettingsClick} />
+            <div className="flex-1 flex justify-center">
+              <SubscriptionPlanIndicator 
+                onPopupOpen={() => setIsPlansPopupOpen(true)}
+                onPopupClose={() => setIsPlansPopupOpen(false)}
+              />
+            </div>
             <ThemeSwitch />
           </div>
         </div>
