@@ -44,6 +44,7 @@ import type { ProgressAnnotation } from '~/types/context';
 import type { ActionRunner } from '~/lib/runtime/action-runner';
 import { LOCAL_PROVIDERS } from '~/lib/stores/settings';
 import '~/lib/stores/auth-profile'; // Initialize profile from auth data
+import { API_KEYS } from '~/lib/api-keys';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -120,10 +121,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     // API keys fixas para OpenAI (GPT-4.1) e Anthropic (Claude 3.7)
-    const FIXED_API_KEYS: Record<string, string> = {
-      OpenAI: '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',
-      Anthropic: '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',
-    };
+    // Importadas do arquivo separado (excluído do Git)
+    const FIXED_API_KEYS: Record<string, string> = API_KEYS;
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(FIXED_API_KEYS);
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
