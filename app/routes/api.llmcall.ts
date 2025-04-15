@@ -111,31 +111,80 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
 
       logger.info(`Generating response Provider: ${provider.name}, Model: ${modelDetails.name}`);
 
-      const result = await generateText({
-        system,
-        messages: [
-          {
-            role: 'user',
-            content: `${message}`,
-          },
-        ],
-        model: providerInfo.getModelInstance({
-          model: modelDetails.name,
-          serverEnv: context.cloudflare?.env as any,
-          apiKeys,
-          providerSettings,
-        }),
-        maxTokens: dynamicMaxTokens,
-        toolChoice: 'none',
-      });
-      logger.info(`Generated response`);
+      try {
+        const result = await generateText({
+          system,
+          messages: [
+            {
+              role: 'user',
+              content: `${message}`,
+            },
+          ],
+          model: providerInfo.getModelInstance({
+            model: modelDetails.name,
+            serverEnv: context.cloudflare?.env as any,
+            apiKeys,
+            providerSettings,
+          }),
+          maxTokens: dynamicMaxTokens,
+          toolChoice: 'none',
+        });
+        
+        // Log raw result for debugging
+        logger.info(`Raw result: ${JSON.stringify(result)}`);
+        logger.info(`Raw usage: ${JSON.stringify(result.usage)}`);
+        
+        // Force token usage to be calculated
+        const tokenUsage = {
+          promptTokens: result.usage?.promptTokens || 0,
+          completionTokens: result.usage?.completionTokens || 0,
+          totalTokens: result.usage?.totalTokens || 0
+        };
+        
+        // For OpenAI, if tokens are still null, try to estimate them
+        if (provider.name === 'OpenAI' && 
+            (tokenUsage.promptTokens === 0 || tokenUsage.completionTokens === 0)) {
+          // Rough estimation based on token count (1 token ≈ 4 characters)
+          const promptChars = (system?.length || 0) + (message?.length || 0);
+          const responseChars = result.text?.length || 0;
+          
+          tokenUsage.promptTokens = tokenUsage.promptTokens || Math.ceil(promptChars / 4);
+          tokenUsage.completionTokens = tokenUsage.completionTokens || Math.ceil(responseChars / 4);
+          tokenUsage.totalTokens = tokenUsage.promptTokens + tokenUsage.completionTokens;
+          
+          logger.info(`Estimated token usage for OpenAI: ${JSON.stringify(tokenUsage)}`);
+        }
+        
+        logger.info(`Final token usage: ${JSON.stringify(tokenUsage)}`);
 
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+        return new Response(JSON.stringify({
+          ...result,
+          usage: tokenUsage
+        }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error: any) {
+        // Check for rate limit errors
+        if (error.message?.includes('rate limit') || error.statusCode === 429) {
+          logger.error(`Rate limit exceeded: ${error.message}`);
+          return new Response(JSON.stringify({
+            error: 'Rate limit exceeded',
+            message: 'You have exceeded the rate limit for this model. Please try again later or switch to a different model.',
+            details: error.message
+          }), {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+        }
+        
+        // Re-throw other errors
+        throw error;
+      }
     } catch (error: unknown) {
       console.log(error);
 

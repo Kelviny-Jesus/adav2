@@ -45,14 +45,7 @@ export const ModelSelector = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter models based on search query
-  const filteredModels = [...modelList]
-    .filter((e) => e.provider === provider?.name && e.name)
-    .filter(
-      (model) =>
-        model.label.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
-        model.name.toLowerCase().includes(modelSearchQuery.toLowerCase()),
-    );
+  // (Removido: filtragem antiga de modelos baseada em provider)
 
   // Reset focused index when search query changes or dropdown opens/closes
   useEffect(() => {
@@ -164,33 +157,28 @@ export const ModelSelector = ({
     );
   }
 
+  // Model selector only (no provider select)
+  // Filtrar apenas os dois modelos permitidos
+  const allowedModels = [
+    { name: 'gpt-4.1-2025-04-14', provider: 'OpenAI', label: 'GPT-4.1' },
+    { name: 'claude-3-7-sonnet-20250219', provider: 'Anthropic', label: 'Claude 3.7 Sonnet' },
+  ];
+  const filteredModels = allowedModels
+    .map((am) => {
+      // Procurar no modelList para pegar o objeto real (com id, label, etc)
+      const found = modelList.find((m) => m.name === am.name && m.provider === am.provider);
+      return found || { ...am, id: am.name, label: am.label };
+    })
+    .filter(Boolean)
+    .filter(
+      (model) =>
+        model.label.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
+        model.name.toLowerCase().includes(modelSearchQuery.toLowerCase()),
+    );
+
   return (
-    <div className="mb-2 flex gap-2 flex-col sm:flex-row">
-      <select
-        value={provider?.name ?? ''}
-        onChange={(e) => {
-          const newProvider = providerList.find((p: ProviderInfo) => p.name === e.target.value);
-
-          if (newProvider && setProvider) {
-            setProvider(newProvider);
-          }
-
-          const firstModel = [...modelList].find((m) => m.provider === e.target.value);
-
-          if (firstModel && setModel) {
-            setModel(firstModel.name);
-          }
-        }}
-        className="flex-1 p-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus transition-all"
-      >
-        {providerList.map((provider: ProviderInfo) => (
-          <option key={provider.name} value={provider.name}>
-            {provider.name}
-          </option>
-        ))}
-      </select>
-
-      <div className="relative flex-1 lg:max-w-[70%]" onKeyDown={handleKeyDown} ref={dropdownRef}>
+    <div className="mb-2 flex flex-col">
+      <div className="relative" onKeyDown={handleKeyDown} ref={dropdownRef}>
         <div
           className={classNames(
             'w-full p-2 rounded-lg border border-bolt-elements-borderColor',
@@ -213,7 +201,9 @@ export const ModelSelector = ({
           tabIndex={0}
         >
           <div className="flex items-center justify-between">
-            <div className="truncate">{modelList.find((m) => m.name === model)?.label || 'Select model'}</div>
+            <div className="truncate">
+              {filteredModels.find((m) => m.name === model)?.label || 'Select model'}
+            </div>
             <div
               className={classNames(
                 'i-ph:caret-down w-4 h-4 text-bolt-elements-textSecondary opacity-75',
@@ -270,7 +260,7 @@ export const ModelSelector = ({
                 'sm:[&::-webkit-scrollbar-track]:bg-transparent',
               )}
             >
-              {modelLoading === 'all' || modelLoading === provider?.name ? (
+              {modelLoading === 'all' ? (
                 <div className="px-3 py-2 text-sm text-bolt-elements-textTertiary">Loading...</div>
               ) : filteredModels.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-bolt-elements-textTertiary">No models found</div>
@@ -296,6 +286,16 @@ export const ModelSelector = ({
                       setModel?.(modelOption.name);
                       setIsModelDropdownOpen(false);
                       setModelSearchQuery('');
+                      // Setar provider automaticamente
+                      if (setProvider) {
+                        if (modelOption.name === 'gpt-4.1-2025-04-14') {
+                          const openai = providerList.find((p) => p.name === 'OpenAI');
+                          if (openai) setProvider(openai);
+                        } else if (modelOption.name === 'claude-3-7-sonnet-20250219') {
+                          const anthropic = providerList.find((p) => p.name === 'Anthropic');
+                          if (anthropic) setProvider(anthropic);
+                        }
+                      }
                     }}
                     tabIndex={focusedIndex === index ? 0 : -1}
                   >

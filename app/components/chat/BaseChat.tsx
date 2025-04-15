@@ -30,6 +30,8 @@ import GitCloneButton from './GitCloneButton';
 import FilePreview from './FilePreview';
 import { ModelSelector } from '~/components/chat/ModelSelector';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
+import { SupabaseConnection } from '~/components/chat/SupabaseConnection';
+import { SupabaseAlert } from '~/components/chat/SupabaseAlert';
 import type { ProviderInfo } from '~/types/model';
 import { ScreenshotStateManager } from './ScreenshotStateManager';
 import { toast } from 'react-toastify';
@@ -117,7 +119,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     ref,
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
-    const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
+    // API keys fixas para OpenAI (GPT-4.1) e Anthropic (Claude 3.7)
+    const FIXED_API_KEYS: Record<string, string> = {
+      OpenAI: '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',
+      Anthropic: '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',
+    };
+    const [apiKeys, setApiKeys] = useState<Record<string, string>>(FIXED_API_KEYS);
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
     const [isListening, setIsListening] = useState(false);
@@ -174,16 +181,12 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     }, []);
 
     useEffect(() => {
-      if (typeof window !== 'undefined') {
-        let parsedApiKeys: Record<string, string> | undefined = {};
+      // Sempre sobrescrever as chaves para garantir que são as fixas
+      setApiKeys(FIXED_API_KEYS);
 
-        try {
-          parsedApiKeys = getApiKeysFromCookies();
-          setApiKeys(parsedApiKeys);
-        } catch (error) {
-          console.error('Error loading API keys from cookies:', error);
-          Cookies.remove('apiKeys');
-        }
+      // Garantir que o cookie apiKeys está correto para o backend
+      if (typeof window !== 'undefined') {
+        Cookies.set('apiKeys', JSON.stringify(FIXED_API_KEYS), { path: '/' });
 
         setIsModelLoading('all');
         fetch('/api/models')
@@ -201,29 +204,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     }, [providerList, provider]);
 
-    const onApiKeysChange = async (providerName: string, apiKey: string) => {
-      const newApiKeys = { ...apiKeys, [providerName]: apiKey };
-      setApiKeys(newApiKeys);
-      Cookies.set('apiKeys', JSON.stringify(newApiKeys));
-
-      setIsModelLoading(providerName);
-
-      let providerModels: ModelInfo[] = [];
-
-      try {
-        const response = await fetch(`/api/models/${encodeURIComponent(providerName)}`);
-        const data = await response.json();
-        providerModels = (data as { modelList: ModelInfo[] }).modelList;
-      } catch (error) {
-        console.error('Error loading dynamic models for:', providerName, error);
-      }
-
-      // Only update models for the specific provider
-      setModelList((prevModels) => {
-        const otherModels = prevModels.filter((model) => model.provider !== providerName);
-        return [...otherModels, ...providerModels];
-      });
-      setIsModelLoading(undefined);
+    // Sobrescrever para nunca permitir alteração das chaves fixas
+    const onApiKeysChange = async (_providerName: string, _apiKey: string) => {
+      setApiKeys(FIXED_API_KEYS);
+      // Não faz nada, pois as chaves são fixas
     };
 
     const startListening = () => {
@@ -494,6 +478,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       }}
                     />
                   )}
+                  <SupabaseAlert />
                 </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
                 <div
@@ -533,7 +518,17 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   <rect className={classNames(styles.PromptEffectLine)} pathLength="100" strokeLinecap="round"></rect>
   <rect className={classNames(styles.PromptShine)} x="48" y="24" width="70" height="1"></rect>
 </svg>
-                  {/* Model selector and API key manager are hidden as requested */}
+                  {/* Model selector for LLM choice */}
+                  <ModelSelector
+                    model={model}
+                    setModel={setModel}
+                    provider={provider}
+                    setProvider={setProvider}
+                    modelList={modelList}
+                    providerList={providerList || []}
+                    apiKeys={apiKeys}
+                    modelLoading={isModelLoading}
+                  />
                   <FilePreview
                     files={uploadedFiles}
                     imageDataList={imageDataList}
@@ -689,6 +684,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           // Don't show export button for free users
                           return userPlan !== 'free' ? <ExportChatButton exportChat={exportChat} /> : null;
                         }}</ClientOnly>}
+                        <SupabaseConnection />
                         {/* Model settings button hidden as requested */}
                       </div>
                       {input.length > 3 ? (
