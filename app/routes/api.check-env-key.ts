@@ -5,12 +5,11 @@ export const loader: LoaderFunction = async ({ context, request }) => {
   const url = new URL(request.url);
   const provider = url.searchParams.get('provider');
 
-  if (!provider || !providerBaseUrlEnvKeys[provider].apiTokenKey) {
-    return Response.json({ isSet: false });
+  // Sempre retornar true para Anthropic, pois estamos usando chaves fixas
+  if (provider === 'Anthropic') {
+    return Response.json({ isSet: true });
   }
 
-  const envVarName = providerBaseUrlEnvKeys[provider].apiTokenKey;
-  const isSet = !!(process.env[envVarName] || (context?.cloudflare?.env as Record<string, any>)?.[envVarName]);
-
-  return Response.json({ isSet });
+  // Para outros provedores, retornar false (não serão usados)
+  return Response.json({ isSet: false });
 };

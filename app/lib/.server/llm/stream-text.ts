@@ -61,7 +61,8 @@ export async function streamText(props: {
     return message;
   });
 
-  const provider = PROVIDER_LIST.find((p) => p.name === currentProvider) || DEFAULT_PROVIDER;
+  // Forçar o uso do provedor Anthropic
+  const provider = PROVIDER_LIST.find((p) => p.name === 'Anthropic') || DEFAULT_PROVIDER;
   const staticModels = LLMManager.getInstance().getStaticModelListFromProvider(provider);
   let modelDetails = staticModels.find((m) => m.name === currentModel);
 

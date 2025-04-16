@@ -82,27 +82,20 @@ export async function loader({
     });
   }
 
-  // Filtrar apenas os provedores e modelos desejados
-  const allowedProviders = ['Anthropic', 'OpenAI'];
-  const allowedModels = [
-    { name: 'gpt-4.1-2025-04-14', provider: 'OpenAI' },
-    { name: 'claude-3-7-sonnet-20250219', provider: 'Anthropic' },
-  ];
-
-  const filteredProviders = providers.filter((p) => allowedProviders.includes(p.name));
-  const filteredModelList = modelList.filter((m) =>
-    allowedModels.some((am) => am.name === m.name && am.provider === m.provider)
-  );
-
-  // Ajustar defaultProvider se necessário
-  let filteredDefaultProvider = filteredProviders[0] || null;
-  if (defaultProvider && allowedProviders.includes(defaultProvider.name)) {
-    filteredDefaultProvider = defaultProvider;
+  // Apenas retornar o provedor Anthropic e seus modelos
+  const anthropicProvider = providers.find(p => p.name === 'Anthropic');
+  const anthropicModels = modelList.filter(m => m.provider === 'Anthropic');
+  
+  // Garantir que sempre temos um provedor Anthropic
+  if (!anthropicProvider) {
+    throw new Error('Anthropic provider not found');
   }
+  
+  const filteredProviders = [anthropicProvider];
 
   return json<ModelsResponse>({
-    modelList: filteredModelList,
+    modelList: anthropicModels,
     providers: filteredProviders,
-    defaultProvider: filteredDefaultProvider,
+    defaultProvider: anthropicProvider,
   });
 }

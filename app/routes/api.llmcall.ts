@@ -103,10 +103,11 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
 
       const dynamicMaxTokens = modelDetails && modelDetails.maxTokenAllowed ? modelDetails.maxTokenAllowed : MAX_TOKENS;
 
-      const providerInfo = PROVIDER_LIST.find((p) => p.name === provider.name);
+      // Forçar o uso do provedor Anthropic
+      const providerInfo = PROVIDER_LIST.find((p) => p.name === 'Anthropic');
 
       if (!providerInfo) {
-        throw new Error('Provider not found');
+        throw new Error('Anthropic provider not found');
       }
 
       logger.info(`Generating response Provider: ${provider.name}, Model: ${modelDetails.name}`);
