@@ -216,6 +216,25 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     }, [providerList, provider, setModel, setProvider]);
 
+    // Conectar automaticamente ao Supabase para uso de banco de dados
+    useEffect(() => {
+      // Disparar evento para abrir o diálogo de conexão do Supabase
+      // quando o chat for iniciado pela primeira vez
+      if (chatStarted) {
+        // Verificar se já existe uma conexão salva
+        const savedConnection = localStorage.getItem('supabase_connection');
+        
+        if (!savedConnection) {
+          // Se não existir, mostrar uma mensagem informando que o Supabase
+          // é recomendado para operações de banco de dados
+          toast.info(
+            'Para operações de banco de dados, recomendamos conectar ao Supabase. Clique no ícone do Supabase na barra de ferramentas.',
+            { autoClose: 10000 }
+          );
+        }
+      }
+    }, [chatStarted]);
+
     // Sobrescrever para nunca permitir alteração das chaves fixas
     const onApiKeysChange = async (_providerName: string, _apiKey: string) => {
       setApiKeys(FIXED_API_KEYS);
