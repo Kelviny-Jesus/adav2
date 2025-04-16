@@ -28,7 +28,7 @@ import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import GitCloneButton from './GitCloneButton';
 
 import FilePreview from './FilePreview';
-import { ModelSelector } from '~/components/chat/ModelSelector';
+// ModelSelector removed as requested
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 import { SupabaseConnection } from '~/components/chat/SupabaseConnection';
 import { SupabaseAlert } from '~/components/chat/SupabaseAlert';
@@ -121,8 +121,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     // API keys fixas para OpenAI (GPT-4.1) e Anthropic (Claude 3.7)
     const FIXED_API_KEYS: Record<string, string> = {
-      OpenAI: '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',
-      Anthropic: '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',
+      Anthropic: 'api_here',
     };
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(FIXED_API_KEYS);
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
@@ -179,6 +178,20 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         setRecognition(recognition);
       }
     }, []);
+
+    // Set Claude 3.7 as the default model
+    useEffect(() => {
+      // Find Anthropic provider in providerList
+      const anthropicProvider = providerList?.find(p => p.name === 'Anthropic');
+      if (anthropicProvider && setProvider) {
+        setProvider(anthropicProvider);
+      }
+      
+      // Set Claude 3.7 as the model
+      if (setModel) {
+        setModel('claude-3-7-sonnet-20250219');
+      }
+    }, [providerList, setProvider, setModel]);
 
     useEffect(() => {
       // Sempre sobrescrever as chaves para garantir que são as fixas
@@ -518,17 +531,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   <rect className={classNames(styles.PromptEffectLine)} pathLength="100" strokeLinecap="round"></rect>
   <rect className={classNames(styles.PromptShine)} x="48" y="24" width="70" height="1"></rect>
 </svg>
-                  {/* Model selector for LLM choice */}
-                  <ModelSelector
-                    model={model}
-                    setModel={setModel}
-                    provider={provider}
-                    setProvider={setProvider}
-                    modelList={modelList}
-                    providerList={providerList || []}
-                    apiKeys={apiKeys}
-                    modelLoading={isModelLoading}
-                  />
+                  {/* Model selector removed - Claude 3.7 is fixed */}
                   <FilePreview
                     files={uploadedFiles}
                     imageDataList={imageDataList}
