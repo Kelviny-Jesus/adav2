@@ -180,7 +180,20 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       }
     }, []);
 
+    // Definir o modelo padrão como Claude 3.7 Sonnet e o provedor como Anthropic
     useEffect(() => {
+      // Definir o modelo e provedor fixos
+      if (setModel) {
+        setModel('claude-3-7-sonnet-20250219');
+      }
+      
+      if (setProvider && providerList && providerList.length > 0) {
+        const anthropicProvider = providerList.find(p => p.name === 'Anthropic');
+        if (anthropicProvider) {
+          setProvider(anthropicProvider);
+        }
+      }
+      
       // Sempre sobrescrever as chaves para garantir que são as fixas
       setApiKeys(FIXED_API_KEYS);
 
@@ -202,7 +215,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             setIsModelLoading(undefined);
           });
       }
-    }, [providerList, provider]);
+    }, [providerList, provider, setModel, setProvider]);
 
     // Sobrescrever para nunca permitir alteração das chaves fixas
     const onApiKeysChange = async (_providerName: string, _apiKey: string) => {
@@ -518,17 +531,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   <rect className={classNames(styles.PromptEffectLine)} pathLength="100" strokeLinecap="round"></rect>
   <rect className={classNames(styles.PromptShine)} x="48" y="24" width="70" height="1"></rect>
 </svg>
-                  {/* Model selector for LLM choice */}
-                  <ModelSelector
-                    model={model}
-                    setModel={setModel}
-                    provider={provider}
-                    setProvider={setProvider}
-                    modelList={modelList}
-                    providerList={providerList || []}
-                    apiKeys={apiKeys}
-                    modelLoading={isModelLoading}
-                  />
+                  {/* Modelo fixo: Claude 3.7 Sonnet */}
+                  {/* ModelSelector foi removido para usar apenas o Claude 3.7 */}
                   <FilePreview
                     files={uploadedFiles}
                     imageDataList={imageDataList}
