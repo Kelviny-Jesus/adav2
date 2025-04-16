@@ -1,0 +1,1 @@
+import{a as i}from"./index-DgoachrA.js";const o=typeof window<"u"?localStorage.getItem("bolt_profile"):null,r=o?JSON.parse(o):{username:"",bio:"",avatar:""},e=i(r),l=t=>{e.set({...e.get(),...t}),typeof window<"u"&&localStorage.setItem("bolt_profile",JSON.stringify(e.get()))};export{e as p,l as u};

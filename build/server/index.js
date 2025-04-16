@@ -1,5 +1,5 @@
 import { jsxs, Fragment, jsx } from 'react/jsx-runtime';
-import { Meta, Links, Outlet, ScrollRestoration, Scripts, RemixServer, useLoaderData } from '@remix-run/react';
+import { Meta, Links, Outlet, ScrollRestoration, Scripts, RemixServer, useLoaderData, useNavigate, useLocation, Link, useSearchParams } from '@remix-run/react';
 import { isbot } from 'isbot';
 import { renderToReadableStream } from 'react-dom/server';
 import { createHead, renderHeadToString } from 'remix-island';
@@ -13,15 +13,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { json } from '@remix-run/cloudflare';
 import process from 'vite-plugin-node-polyfills/shims/process';
-import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createCohere } from '@ai-sdk/cohere';
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createMistral } from '@ai-sdk/mistral';
-import { ollama } from 'ollama-ai-provider';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { execSync, exec } from 'child_process';
 import { generateText, streamText as streamText$1, convertToCoreMessages, createDataStream, generateId as generateId$1 } from 'ai';
 import { defaultSchema } from 'rehype-sanitize';
@@ -37,22 +29,19 @@ import Buffer from 'vite-plugin-node-polyfills/shims/buffer';
 import '@webcontainer/api';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web/index.js';
-import * as Dialog from '@radix-ui/react-dialog';
-import { motion, AnimatePresence, cubicBezier } from 'framer-motion';
+import * as Dialog$1 from '@radix-ui/react-dialog';
+import { Root, Close } from '@radix-ui/react-dialog';
+import 'path-browserify';
+import 'jszip';
+import fileSaver from 'file-saver';
+import 'diff';
+import { motion, cubicBezier, AnimatePresence } from 'framer-motion';
 import { create } from 'zustand';
 
 const tailwindReset = "/assets/tailwind-compat-Bwh-BmjE.css";
 
 const chalk = new Chalk({ level: 3 });
 let currentLevel = "info";
-const logger$8 = {
-  trace: (...messages) => log("trace", void 0, messages),
-  debug: (...messages) => log("debug", void 0, messages),
-  info: (...messages) => log("info", void 0, messages),
-  warn: (...messages) => log("warn", void 0, messages),
-  error: (...messages) => log("error", void 0, messages),
-  setLevel
-};
 function createScopedLogger(scope) {
   return {
     trace: (...messages) => log("trace", scope, messages),
@@ -128,7 +117,7 @@ function getColorForLevel(level) {
   }
 }
 
-const logger$7 = createScopedLogger("LogStore");
+const logger$8 = createScopedLogger("LogStore");
 const MAX_LOGS = 1e3;
 class LogStore {
   _logs = map({});
@@ -151,7 +140,7 @@ class LogStore {
         const parsedLogs = JSON.parse(savedLogs);
         this._logs.set(parsedLogs);
       } catch (error) {
-        logger$7.error("Failed to parse logs from cookies:", error);
+        logger$8.error("Failed to parse logs from cookies:", error);
       }
     }
   }
@@ -165,7 +154,7 @@ class LogStore {
         const parsedReadLogs = JSON.parse(savedReadLogs);
         this._readLogs = new Set(parsedReadLogs);
       } catch (error) {
-        logger$7.error("Failed to parse read logs:", error);
+        logger$8.error("Failed to parse read logs:", error);
       }
     }
   }
@@ -741,6 +730,318 @@ const route1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader: loader$9
 }, Symbol.toStringTag, { value: 'Module' }));
 
+async function resetPassword(formData) {
+  const email = formData.get("email");
+  const password = formData.get("password");
+  const confirmPassword = formData.get("confirmPassword");
+  if (!email || !password || !confirmPassword) {
+    return { error: "Email and passwords are required" };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match" };
+  }
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return {
+      error: "Password must be at least 8 characters long and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character"
+    };
+  }
+  try {
+    const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/reset/password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await response.json();
+    if (data.status) {
+      return { success: true, message: "Password reset successfully" };
+    } else {
+      return { error: data.msg };
+    }
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    return { error: "Failed to reset password. Please try again." };
+  }
+}
+
+const action$d = async ({ request }) => {
+  const formData = await request.formData();
+  const email = formData.get("email");
+  const verificationCode = formData.get("code");
+  const password = formData.get("password");
+  const confirmPassword = formData.get("confirmPassword");
+  if (!email || !verificationCode || !password || !confirmPassword) {
+    return json({ error: "All fields are required" });
+  }
+  if (password !== confirmPassword) {
+    return json({ error: "Passwords do not match" });
+  }
+  try {
+    const verifyResponse = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/verify-reset-code", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        code: verificationCode
+      })
+    });
+    const verifyData = await verifyResponse.json();
+    if (!verifyResponse.ok || !verifyData.status) {
+      return json({ error: verifyData.msg || "Invalid verification code. Please try again." });
+    }
+    const resetFormData = new FormData();
+    resetFormData.append("email", email);
+    resetFormData.append("password", password);
+    resetFormData.append("confirmPassword", confirmPassword);
+    const result = await resetPassword(resetFormData);
+    if (result.success) {
+      return json({ success: true, message: "Password reset successfully" });
+    } else {
+      return json({ error: result.error });
+    }
+  } catch (error) {
+    console.error("Error in reset process:", error);
+    return json({ error: "An unexpected error occurred. Please try again." });
+  }
+};
+function ResetCodeVerificationPage() {
+  const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const emailParam = params.get("email");
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [location]);
+  const handleCodeChange = (index, value) => {
+    if (value && !/^\d+$/.test(value)) {
+      return;
+    }
+    const newCode = [...code];
+    if (value.length > 1 && index === 0) {
+      if (value.length === 6 && /^\d+$/.test(value)) {
+        const digits = value.split("");
+        setCode(digits);
+        const lastInput = document.getElementById(`code-input-5`);
+        if (lastInput) {
+          lastInput.focus();
+        }
+        return;
+      }
+    }
+    newCode[index] = value;
+    setCode(newCode);
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`code-input-${index + 1}`);
+      if (nextInput) {
+        nextInput.focus();
+      }
+    }
+  };
+  const handleKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      const prevInput = document.getElementById(`code-input-${index - 1}`);
+      if (prevInput) {
+        prevInput.focus();
+      }
+    }
+  };
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    const verificationCode = code.join("");
+    if (verificationCode.length !== 6) {
+      setError("Please enter a 6-digit verification code");
+      setIsLoading(false);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const verifyResponse = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/verify-reset-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          code: verificationCode
+        })
+      });
+      const verifyData = await verifyResponse.json();
+      if (!verifyResponse.ok || !verifyData.status) {
+        setError(verifyData.msg || "Invalid verification code. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("password", password);
+      formData.append("confirmPassword", confirmPassword);
+      const result = await resetPassword(formData);
+      if (result.success) {
+        setSuccess("Password reset successfully. You will be redirected to login.");
+        setTimeout(() => {
+          navigate("/login");
+        }, 3e3);
+      } else {
+        setError(result.error || "Failed to reset password. Please try again.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col bg-[#0a0a0c] bg-gradient-to-br from-[#0a0a0c] via-[#0d1117] to-[#131c2e] relative", children: [
+    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-[url('data:image/svg+xml;base64PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAuMDUiPjxwYXRoIGQ9Ik0yMCAyMGgyMHYyMEgyMHoiLz48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PC9nPjwvc3ZnPg==')] opacity-50" }),
+    /* @__PURE__ */ jsx("header", { className: "p-4 relative", children: /* @__PURE__ */ jsx("div", { className: "container mx-auto", children: /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxs("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "12", stroke: "white", strokeWidth: "1.5" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "3", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "9", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "23", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "9", cy: "16", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "23", cy: "16", r: "1.5", fill: "white" })
+      ] }),
+      /* @__PURE__ */ jsx("span", { className: "text-white text-xl font-semibold", children: "Ada" })
+    ] }) }) }),
+    /* @__PURE__ */ jsx("main", { className: "flex-1 flex items-center justify-center p-6 relative", children: /* @__PURE__ */ jsxs("div", { className: "w-full max-w-md space-y-8", children: [
+      /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-4xl font-bold text-white", children: "Verify Code" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-gray-400", children: "Enter the 6-digit code sent to your email" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] bg-opacity-50 backdrop-blur-sm rounded-lg p-8 shadow-2xl border border-gray-800", children: [
+        error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+        success && /* @__PURE__ */ jsx("div", { className: "bg-green-500 text-white p-3 rounded-md mb-4", children: success }),
+        /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-6", children: [
+          /* @__PURE__ */ jsx("input", { type: "hidden", name: "email", value: email }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { className: "text-gray-200 block", children: "Verification Code" }),
+            /* @__PURE__ */ jsx("div", { className: "flex justify-between gap-2", children: code.map((digit, index) => /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: `code-input-${index}`,
+                type: "text",
+                maxLength: 1,
+                className: "w-full aspect-square text-center px-0 py-2 bg-[#0a0a0c] border border-gray-800 text-white text-xl font-bold focus:border-blue-500 focus:ring-blue-500 rounded-md",
+                value: digit,
+                onChange: (e) => handleCodeChange(index, e.target.value),
+                onKeyDown: (e) => handleKeyDown(index, e),
+                autoFocus: index === 0
+              },
+              index
+            )) })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "text-gray-200 block", children: "New Password" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "password",
+                name: "password",
+                type: "password",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true,
+                value: password,
+                onChange: (e) => setPassword(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "confirmPassword", className: "text-gray-200 block", children: "Confirm New Password" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "confirmPassword",
+                name: "confirmPassword",
+                type: "password",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true,
+                value: confirmPassword,
+                onChange: (e) => setConfirmPassword(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              type: "submit",
+              className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md",
+              disabled: isLoading,
+              children: isLoading ? "Resetting..." : "Reset Password"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-6 text-center", children: /* @__PURE__ */ jsxs("p", { className: "text-gray-400", children: [
+          "Didn't receive a code?",
+          " ",
+          /* @__PURE__ */ jsx(Link, { to: "/forgot-password", className: "text-gray-200 hover:text-white", children: "Request again" })
+        ] }) })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsx("footer", { className: "py-4 relative", children: /* @__PURE__ */ jsxs("div", { className: "container mx-auto text-center text-gray-500 text-sm", children: [
+      "© ",
+      (/* @__PURE__ */ new Date()).getFullYear(),
+      " Ada. All rights reserved."
+    ] }) })
+  ] });
+}
+
+const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$d,
+  default: ResetCodeVerificationPage
+}, Symbol.toStringTag, { value: 'Module' }));
+
+async function action$c({ request }) {
+  try {
+    const body = await request.json();
+    const { projectId, token } = body;
+    if (!projectId || !token) {
+      return json({ error: "Project ID and token are required" }, { status: 400 });
+    }
+    const response = await fetch(`https://api.supabase.com/v1/projects/${projectId}/api-keys`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!response.ok) {
+      return json({ error: `Failed to fetch API keys: ${response.statusText}` }, { status: response.status });
+    }
+    const apiKeys = await response.json();
+    return json({ apiKeys });
+  } catch (error) {
+    console.error("Error fetching project API keys:", error);
+    return json({ error: error instanceof Error ? error.message : "Unknown error occurred" }, { status: 500 });
+  }
+}
+
+const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$c
+}, Symbol.toStringTag, { value: 'Module' }));
+
 class BaseProvider {
   cachedDynamicModels;
   getApiKeyLink;
@@ -792,13 +1093,6 @@ class BaseProvider {
     };
   }
 }
-function getOpenAILikeModel(baseURL, apiKey, model) {
-  const openai = createOpenAI({
-    baseURL,
-    apiKey
-  });
-  return openai(model);
-}
 
 class AnthropicProvider extends BaseProvider {
   name = "Anthropic";
@@ -808,26 +1102,11 @@ class AnthropicProvider extends BaseProvider {
   };
   staticModels = [
     {
-      name: "claude-3-5-sonnet-latest",
-      label: "Claude 3.5 Sonnet (new)",
+      name: "claude-3-7-sonnet-20250219",
+      label: "Claude 3.7 Sonnet",
       provider: "Anthropic",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "claude-3-5-sonnet-20240620",
-      label: "Claude 3.5 Sonnet (old)",
-      provider: "Anthropic",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "claude-3-5-haiku-latest",
-      label: "Claude 3.5 Haiku (new)",
-      provider: "Anthropic",
-      maxTokenAllowed: 8e3
-    },
-    { name: "claude-3-opus-latest", label: "Claude 3 Opus", provider: "Anthropic", maxTokenAllowed: 8e3 },
-    { name: "claude-3-sonnet-20240229", label: "Claude 3 Sonnet", provider: "Anthropic", maxTokenAllowed: 8e3 },
-    { name: "claude-3-haiku-20240307", label: "Claude 3 Haiku", provider: "Anthropic", maxTokenAllowed: 8e3 }
+      maxTokenAllowed: 32768
+    }
   ];
   async getDynamicModels(apiKeys, settings, serverEnv) {
     const { apiKey } = this.getProviderBaseUrlAndKey({
@@ -872,1034 +1151,12 @@ class AnthropicProvider extends BaseProvider {
   };
 }
 
-class CohereProvider extends BaseProvider {
-  name = "Cohere";
-  getApiKeyLink = "https://dashboard.cohere.com/api-keys";
-  config = {
-    apiTokenKey: "COHERE_API_KEY"
-  };
-  staticModels = [
-    { name: "command-r-plus-08-2024", label: "Command R plus Latest", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-r-08-2024", label: "Command R Latest", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-r-plus", label: "Command R plus", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-r", label: "Command R", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command", label: "Command", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-nightly", label: "Command Nightly", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-light", label: "Command Light", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "command-light-nightly", label: "Command Light Nightly", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "c4ai-aya-expanse-8b", label: "c4AI Aya Expanse 8b", provider: "Cohere", maxTokenAllowed: 4096 },
-    { name: "c4ai-aya-expanse-32b", label: "c4AI Aya Expanse 32b", provider: "Cohere", maxTokenAllowed: 4096 }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "COHERE_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const cohere = createCohere({
-      apiKey
-    });
-    return cohere(model);
-  }
-}
-
-class DeepseekProvider extends BaseProvider {
-  name = "Deepseek";
-  getApiKeyLink = "https://platform.deepseek.com/apiKeys";
-  config = {
-    apiTokenKey: "DEEPSEEK_API_KEY"
-  };
-  staticModels = [
-    { name: "deepseek-coder", label: "Deepseek-Coder", provider: "Deepseek", maxTokenAllowed: 8e3 },
-    { name: "deepseek-chat", label: "Deepseek-Chat", provider: "Deepseek", maxTokenAllowed: 8e3 },
-    { name: "deepseek-reasoner", label: "Deepseek-Reasoner", provider: "Deepseek", maxTokenAllowed: 8e3 }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "DEEPSEEK_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const deepseek = createDeepSeek({
-      apiKey
-    });
-    return deepseek(model, {
-      // simulateStreaming: true,
-    });
-  }
-}
-
-class GoogleProvider extends BaseProvider {
-  name = "Google";
-  getApiKeyLink = "https://aistudio.google.com/app/apikey";
-  config = {
-    apiTokenKey: "GOOGLE_GENERATIVE_AI_API_KEY"
-  };
-  staticModels = [
-    { name: "gemini-1.5-flash-latest", label: "Gemini 1.5 Flash", provider: "Google", maxTokenAllowed: 8192 },
-    {
-      name: "gemini-2.0-flash-thinking-exp-01-21",
-      label: "Gemini 2.0 Flash-thinking-exp-01-21",
-      provider: "Google",
-      maxTokenAllowed: 65536
-    },
-    { name: "gemini-2.0-flash-exp", label: "Gemini 2.0 Flash", provider: "Google", maxTokenAllowed: 8192 },
-    { name: "gemini-1.5-flash-002", label: "Gemini 1.5 Flash-002", provider: "Google", maxTokenAllowed: 8192 },
-    { name: "gemini-1.5-flash-8b", label: "Gemini 1.5 Flash-8b", provider: "Google", maxTokenAllowed: 8192 },
-    { name: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro", provider: "Google", maxTokenAllowed: 8192 },
-    { name: "gemini-1.5-pro-002", label: "Gemini 1.5 Pro-002", provider: "Google", maxTokenAllowed: 8192 },
-    { name: "gemini-exp-1206", label: "Gemini exp-1206", provider: "Google", maxTokenAllowed: 8192 }
-  ];
-  async getDynamicModels(apiKeys, settings, serverEnv) {
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "GOOGLE_GENERATIVE_AI_API_KEY"
-    });
-    if (!apiKey) {
-      throw `Missing Api Key configuration for ${this.name} provider`;
-    }
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-      headers: {
-        ["Content-Type"]: "application/json"
-      }
-    });
-    const res = await response.json();
-    const data = res.models.filter((model) => model.outputTokenLimit > 8e3);
-    return data.map((m) => ({
-      name: m.name.replace("models/", ""),
-      label: `${m.displayName} - context ${Math.floor((m.inputTokenLimit + m.outputTokenLimit) / 1e3) + "k"}`,
-      provider: this.name,
-      maxTokenAllowed: m.inputTokenLimit + m.outputTokenLimit || 8e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "GOOGLE_GENERATIVE_AI_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const google = createGoogleGenerativeAI({
-      apiKey
-    });
-    return google(model);
-  }
-}
-
-class GroqProvider extends BaseProvider {
-  name = "Groq";
-  getApiKeyLink = "https://console.groq.com/keys";
-  config = {
-    apiTokenKey: "GROQ_API_KEY"
-  };
-  staticModels = [
-    { name: "llama-3.1-8b-instant", label: "Llama 3.1 8b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    { name: "llama-3.2-11b-vision-preview", label: "Llama 3.2 11b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    { name: "llama-3.2-90b-vision-preview", label: "Llama 3.2 90b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    { name: "llama-3.2-3b-preview", label: "Llama 3.2 3b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    { name: "llama-3.2-1b-preview", label: "Llama 3.2 1b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    { name: "llama-3.3-70b-versatile", label: "Llama 3.3 70b (Groq)", provider: "Groq", maxTokenAllowed: 8e3 },
-    {
-      name: "deepseek-r1-distill-llama-70b",
-      label: "Deepseek R1 Distill Llama 70b (Groq)",
-      provider: "Groq",
-      maxTokenAllowed: 131072
-    }
-  ];
-  async getDynamicModels(apiKeys, settings, serverEnv) {
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "GROQ_API_KEY"
-    });
-    if (!apiKey) {
-      throw `Missing Api Key configuration for ${this.name} provider`;
-    }
-    const response = await fetch(`https://api.groq.com/openai/v1/models`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
-    const res = await response.json();
-    const data = res.data.filter(
-      (model) => model.object === "model" && model.active && model.context_window > 8e3
-    );
-    return data.map((m) => ({
-      name: m.id,
-      label: `${m.id} - context ${m.context_window ? Math.floor(m.context_window / 1e3) + "k" : "N/A"} [ by ${m.owned_by}]`,
-      provider: this.name,
-      maxTokenAllowed: m.context_window || 8e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "GROQ_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openai = createOpenAI({
-      baseURL: "https://api.groq.com/openai/v1",
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
-class HuggingFaceProvider extends BaseProvider {
-  name = "HuggingFace";
-  getApiKeyLink = "https://huggingface.co/settings/tokens";
-  config = {
-    apiTokenKey: "HuggingFace_API_KEY"
-  };
-  staticModels = [
-    {
-      name: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      label: "Qwen2.5-Coder-32B-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "01-ai/Yi-1.5-34B-Chat",
-      label: "Yi-1.5-34B-Chat (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "codellama/CodeLlama-34b-Instruct-hf",
-      label: "CodeLlama-34b-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "NousResearch/Hermes-3-Llama-3.1-8B",
-      label: "Hermes-3-Llama-3.1-8B (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      label: "Qwen2.5-Coder-32B-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "Qwen/Qwen2.5-72B-Instruct",
-      label: "Qwen2.5-72B-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "meta-llama/Llama-3.1-70B-Instruct",
-      label: "Llama-3.1-70B-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "meta-llama/Llama-3.1-405B",
-      label: "Llama-3.1-405B (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "01-ai/Yi-1.5-34B-Chat",
-      label: "Yi-1.5-34B-Chat (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "codellama/CodeLlama-34b-Instruct-hf",
-      label: "CodeLlama-34b-Instruct (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "NousResearch/Hermes-3-Llama-3.1-8B",
-      label: "Hermes-3-Llama-3.1-8B (HuggingFace)",
-      provider: "HuggingFace",
-      maxTokenAllowed: 8e3
-    }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "HuggingFace_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openai = createOpenAI({
-      baseURL: "https://api-inference.huggingface.co/v1/",
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
-class LMStudioProvider extends BaseProvider {
-  name = "LMStudio";
-  getApiKeyLink = "https://lmstudio.ai/";
-  labelForGetApiKey = "Get LMStudio";
-  icon = "i-ph:cloud-arrow-down";
-  config = {
-    baseUrlKey: "LMSTUDIO_API_BASE_URL",
-    baseUrl: "http://localhost:1234/"
-  };
-  staticModels = [];
-  async getDynamicModels(apiKeys, settings, serverEnv = {}) {
-    let { baseUrl } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "LMSTUDIO_API_BASE_URL",
-      defaultApiTokenKey: ""
-    });
-    if (!baseUrl) {
-      throw new Error("No baseUrl found for LMStudio provider");
-    }
-    if (typeof window === "undefined") {
-      const isDocker = process?.env?.RUNNING_IN_DOCKER === "true" || serverEnv?.RUNNING_IN_DOCKER === "true";
-      baseUrl = isDocker ? baseUrl.replace("localhost", "host.docker.internal") : baseUrl;
-      baseUrl = isDocker ? baseUrl.replace("127.0.0.1", "host.docker.internal") : baseUrl;
-    }
-    const response = await fetch(`${baseUrl}/v1/models`);
-    const data = await response.json();
-    return data.data.map((model) => ({
-      name: model.id,
-      label: model.id,
-      provider: this.name,
-      maxTokenAllowed: 8e3
-    }));
-  }
-  getModelInstance = (options) => {
-    const { apiKeys, providerSettings, serverEnv, model } = options;
-    let { baseUrl } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "LMSTUDIO_API_BASE_URL",
-      defaultApiTokenKey: ""
-    });
-    if (!baseUrl) {
-      throw new Error("No baseUrl found for LMStudio provider");
-    }
-    const isDocker = process.env.RUNNING_IN_DOCKER === "true" || serverEnv?.RUNNING_IN_DOCKER === "true";
-    if (typeof window === "undefined") {
-      baseUrl = isDocker ? baseUrl.replace("localhost", "host.docker.internal") : baseUrl;
-      baseUrl = isDocker ? baseUrl.replace("127.0.0.1", "host.docker.internal") : baseUrl;
-    }
-    logger$8.debug("LMStudio Base Url used: ", baseUrl);
-    const lmstudio = createOpenAI({
-      baseURL: `${baseUrl}/v1`,
-      apiKey: ""
-    });
-    return lmstudio(model);
-  };
-}
-
-class MistralProvider extends BaseProvider {
-  name = "Mistral";
-  getApiKeyLink = "https://console.mistral.ai/api-keys/";
-  config = {
-    apiTokenKey: "MISTRAL_API_KEY"
-  };
-  staticModels = [
-    { name: "open-mistral-7b", label: "Mistral 7B", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "open-mixtral-8x7b", label: "Mistral 8x7B", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "open-mixtral-8x22b", label: "Mistral 8x22B", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "open-codestral-mamba", label: "Codestral Mamba", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "open-mistral-nemo", label: "Mistral Nemo", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "ministral-8b-latest", label: "Mistral 8B", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "mistral-small-latest", label: "Mistral Small", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "codestral-latest", label: "Codestral", provider: "Mistral", maxTokenAllowed: 8e3 },
-    { name: "mistral-large-latest", label: "Mistral Large Latest", provider: "Mistral", maxTokenAllowed: 8e3 }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "MISTRAL_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const mistral = createMistral({
-      apiKey
-    });
-    return mistral(model);
-  }
-}
-
-const DEFAULT_NUM_CTX = process?.env?.DEFAULT_NUM_CTX ? parseInt(process.env.DEFAULT_NUM_CTX, 10) : 32768;
-class OllamaProvider extends BaseProvider {
-  name = "Ollama";
-  getApiKeyLink = "https://ollama.com/download";
-  labelForGetApiKey = "Download Ollama";
-  icon = "i-ph:cloud-arrow-down";
-  config = {
-    baseUrlKey: "OLLAMA_API_BASE_URL"
-  };
-  staticModels = [];
-  async getDynamicModels(apiKeys, settings, serverEnv = {}) {
-    let { baseUrl } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "OLLAMA_API_BASE_URL",
-      defaultApiTokenKey: ""
-    });
-    if (!baseUrl) {
-      throw new Error("No baseUrl found for OLLAMA provider");
-    }
-    if (typeof window === "undefined") {
-      const isDocker = process?.env?.RUNNING_IN_DOCKER === "true" || serverEnv?.RUNNING_IN_DOCKER === "true";
-      baseUrl = isDocker ? baseUrl.replace("localhost", "host.docker.internal") : baseUrl;
-      baseUrl = isDocker ? baseUrl.replace("127.0.0.1", "host.docker.internal") : baseUrl;
-    }
-    const response = await fetch(`${baseUrl}/api/tags`);
-    const data = await response.json();
-    return data.models.map((model) => ({
-      name: model.name,
-      label: `${model.name} (${model.details.parameter_size})`,
-      provider: this.name,
-      maxTokenAllowed: 8e3
-    }));
-  }
-  getModelInstance = (options) => {
-    const { apiKeys, providerSettings, serverEnv, model } = options;
-    let { baseUrl } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "OLLAMA_API_BASE_URL",
-      defaultApiTokenKey: ""
-    });
-    if (!baseUrl) {
-      throw new Error("No baseUrl found for OLLAMA provider");
-    }
-    const isDocker = process?.env?.RUNNING_IN_DOCKER === "true" || serverEnv?.RUNNING_IN_DOCKER === "true";
-    baseUrl = isDocker ? baseUrl.replace("localhost", "host.docker.internal") : baseUrl;
-    baseUrl = isDocker ? baseUrl.replace("127.0.0.1", "host.docker.internal") : baseUrl;
-    logger$8.debug("Ollama Base Url used: ", baseUrl);
-    const ollamaInstance = ollama(model, {
-      numCtx: DEFAULT_NUM_CTX
-    });
-    ollamaInstance.config.baseURL = `${baseUrl}/api`;
-    return ollamaInstance;
-  };
-}
-
-class OpenRouterProvider extends BaseProvider {
-  name = "OpenRouter";
-  getApiKeyLink = "https://openrouter.ai/settings/keys";
-  config = {
-    apiTokenKey: "OPEN_ROUTER_API_KEY"
-  };
-  staticModels = [
-    {
-      name: "anthropic/claude-3.5-sonnet",
-      label: "Anthropic: Claude 3.5 Sonnet (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "anthropic/claude-3-haiku",
-      label: "Anthropic: Claude 3 Haiku (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "deepseek/deepseek-coder",
-      label: "Deepseek-Coder V2 236B (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "google/gemini-flash-1.5",
-      label: "Google Gemini Flash 1.5 (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "google/gemini-pro-1.5",
-      label: "Google Gemini Pro 1.5 (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    { name: "x-ai/grok-beta", label: "xAI Grok Beta (OpenRouter)", provider: "OpenRouter", maxTokenAllowed: 8e3 },
-    {
-      name: "mistralai/mistral-nemo",
-      label: "OpenRouter Mistral Nemo (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "qwen/qwen-110b-chat",
-      label: "OpenRouter Qwen 110b Chat (OpenRouter)",
-      provider: "OpenRouter",
-      maxTokenAllowed: 8e3
-    },
-    { name: "cohere/command", label: "Cohere Command (OpenRouter)", provider: "OpenRouter", maxTokenAllowed: 4096 }
-  ];
-  async getDynamicModels(_apiKeys, _settings, _serverEnv = {}) {
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/models", {
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      const data = await response.json();
-      return data.data.sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({
-        name: m.id,
-        label: `${m.name} - in:$${(m.pricing.prompt * 1e6).toFixed(2)} out:$${(m.pricing.completion * 1e6).toFixed(2)} - context ${Math.floor(m.context_length / 1e3)}k`,
-        provider: this.name,
-        maxTokenAllowed: 8e3
-      }));
-    } catch (error) {
-      console.error("Error getting OpenRouter models:", error);
-      return [];
-    }
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "OPEN_ROUTER_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openRouter = createOpenRouter({
-      apiKey
-    });
-    const instance = openRouter.chat(model);
-    return instance;
-  }
-}
-
-class OpenAILikeProvider extends BaseProvider {
-  name = "OpenAILike";
-  getApiKeyLink = void 0;
-  config = {
-    baseUrlKey: "OPENAI_LIKE_API_BASE_URL",
-    apiTokenKey: "OPENAI_LIKE_API_KEY"
-  };
-  staticModels = [];
-  async getDynamicModels(apiKeys, settings, serverEnv = {}) {
-    const { baseUrl, apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "OPENAI_LIKE_API_BASE_URL",
-      defaultApiTokenKey: "OPENAI_LIKE_API_KEY"
-    });
-    if (!baseUrl || !apiKey) {
-      return [];
-    }
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
-    const res = await response.json();
-    return res.data.map((model) => ({
-      name: model.id,
-      label: model.id,
-      provider: this.name,
-      maxTokenAllowed: 8e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { baseUrl, apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "OPENAI_LIKE_API_BASE_URL",
-      defaultApiTokenKey: "OPENAI_LIKE_API_KEY"
-    });
-    if (!baseUrl || !apiKey) {
-      throw new Error(`Missing configuration for ${this.name} provider`);
-    }
-    return getOpenAILikeModel(baseUrl, apiKey, model);
-  }
-}
-
-class OpenAIProvider extends BaseProvider {
-  name = "OpenAI";
-  getApiKeyLink = "https://platform.openai.com/api-keys";
-  config = {
-    apiTokenKey: "OPENAI_API_KEY"
-  };
-  staticModels = [
-    { name: "gpt-4o", label: "GPT-4o", provider: "OpenAI", maxTokenAllowed: 8e3 },
-    { name: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI", maxTokenAllowed: 8e3 },
-    { name: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI", maxTokenAllowed: 8e3 },
-    { name: "gpt-4", label: "GPT-4", provider: "OpenAI", maxTokenAllowed: 8e3 },
-    { name: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", provider: "OpenAI", maxTokenAllowed: 8e3 }
-  ];
-  async getDynamicModels(apiKeys, settings, serverEnv) {
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "OPENAI_API_KEY"
-    });
-    if (!apiKey) {
-      throw `Missing Api Key configuration for ${this.name} provider`;
-    }
-    const response = await fetch(`https://api.openai.com/v1/models`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
-    const res = await response.json();
-    const staticModelIds = this.staticModels.map((m) => m.name);
-    const data = res.data.filter(
-      (model) => model.object === "model" && (model.id.startsWith("gpt-") || model.id.startsWith("o") || model.id.startsWith("chatgpt-")) && !staticModelIds.includes(model.id)
-    );
-    return data.map((m) => ({
-      name: m.id,
-      label: `${m.id}`,
-      provider: this.name,
-      maxTokenAllowed: m.context_window || 32e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "OPENAI_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openai = createOpenAI({
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
-class PerplexityProvider extends BaseProvider {
-  name = "Perplexity";
-  getApiKeyLink = "https://www.perplexity.ai/settings/api";
-  config = {
-    apiTokenKey: "PERPLEXITY_API_KEY"
-  };
-  staticModels = [
-    {
-      name: "llama-3.1-sonar-small-128k-online",
-      label: "Sonar Small Online",
-      provider: "Perplexity",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "llama-3.1-sonar-large-128k-online",
-      label: "Sonar Large Online",
-      provider: "Perplexity",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "llama-3.1-sonar-huge-128k-online",
-      label: "Sonar Huge Online",
-      provider: "Perplexity",
-      maxTokenAllowed: 8192
-    }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "PERPLEXITY_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const perplexity = createOpenAI({
-      baseURL: "https://api.perplexity.ai/",
-      apiKey
-    });
-    return perplexity(model);
-  }
-}
-
-class TogetherProvider extends BaseProvider {
-  name = "Together";
-  getApiKeyLink = "https://api.together.xyz/settings/api-keys";
-  config = {
-    baseUrlKey: "TOGETHER_API_BASE_URL",
-    apiTokenKey: "TOGETHER_API_KEY"
-  };
-  staticModels = [
-    {
-      name: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      label: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      provider: "Together",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
-      label: "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
-      provider: "Together",
-      maxTokenAllowed: 8e3
-    },
-    {
-      name: "mistralai/Mixtral-8x7B-Instruct-v0.1",
-      label: "Mixtral 8x7B Instruct",
-      provider: "Together",
-      maxTokenAllowed: 8192
-    }
-  ];
-  async getDynamicModels(apiKeys, settings, serverEnv = {}) {
-    const { baseUrl: fetchBaseUrl, apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "TOGETHER_API_BASE_URL",
-      defaultApiTokenKey: "TOGETHER_API_KEY"
-    });
-    const baseUrl = fetchBaseUrl || "https://api.together.xyz/v1";
-    if (!apiKey) {
-      return [];
-    }
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
-    const res = await response.json();
-    const data = (res || []).filter((model) => model.type === "chat");
-    return data.map((m) => ({
-      name: m.id,
-      label: `${m.display_name} - in:$${m.pricing.input.toFixed(2)} out:$${m.pricing.output.toFixed(2)} - context ${Math.floor(m.context_length / 1e3)}k`,
-      provider: this.name,
-      maxTokenAllowed: 8e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { baseUrl, apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "TOGETHER_API_BASE_URL",
-      defaultApiTokenKey: "TOGETHER_API_KEY"
-    });
-    if (!baseUrl || !apiKey) {
-      throw new Error(`Missing configuration for ${this.name} provider`);
-    }
-    return getOpenAILikeModel(baseUrl, apiKey, model);
-  }
-}
-
-class XAIProvider extends BaseProvider {
-  name = "xAI";
-  getApiKeyLink = "https://docs.x.ai/docs/quickstart#creating-an-api-key";
-  config = {
-    apiTokenKey: "XAI_API_KEY"
-  };
-  staticModels = [
-    { name: "grok-beta", label: "xAI Grok Beta", provider: "xAI", maxTokenAllowed: 8e3 },
-    { name: "grok-2-1212", label: "xAI Grok2 1212", provider: "xAI", maxTokenAllowed: 8e3 }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "XAI_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openai = createOpenAI({
-      baseURL: "https://api.x.ai/v1",
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
-class HyperbolicProvider extends BaseProvider {
-  name = "Hyperbolic";
-  getApiKeyLink = "https://app.hyperbolic.xyz/settings";
-  config = {
-    apiTokenKey: "HYPERBOLIC_API_KEY"
-  };
-  staticModels = [
-    {
-      name: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      label: "Qwen 2.5 Coder 32B Instruct",
-      provider: "Hyperbolic",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "Qwen/Qwen2.5-72B-Instruct",
-      label: "Qwen2.5-72B-Instruct",
-      provider: "Hyperbolic",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "deepseek-ai/DeepSeek-V2.5",
-      label: "DeepSeek-V2.5",
-      provider: "Hyperbolic",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "Qwen/QwQ-32B-Preview",
-      label: "QwQ-32B-Preview",
-      provider: "Hyperbolic",
-      maxTokenAllowed: 8192
-    },
-    {
-      name: "Qwen/Qwen2-VL-72B-Instruct",
-      label: "Qwen2-VL-72B-Instruct",
-      provider: "Hyperbolic",
-      maxTokenAllowed: 8192
-    }
-  ];
-  async getDynamicModels(apiKeys, settings, serverEnv = {}) {
-    const { baseUrl: fetchBaseUrl, apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: settings,
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "HYPERBOLIC_API_KEY"
-    });
-    const baseUrl = fetchBaseUrl || "https://api.hyperbolic.xyz/v1";
-    if (!apiKey) {
-      throw `Missing Api Key configuration for ${this.name} provider`;
-    }
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
-    const res = await response.json();
-    const data = res.data.filter((model) => model.object === "model" && model.supports_chat);
-    return data.map((m) => ({
-      name: m.id,
-      label: `${m.id} - context ${m.context_length ? Math.floor(m.context_length / 1e3) + "k" : "N/A"}`,
-      provider: this.name,
-      maxTokenAllowed: m.context_length || 8e3
-    }));
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "HYPERBOLIC_API_KEY"
-    });
-    if (!apiKey) {
-      throw `Missing Api Key configuration for ${this.name} provider`;
-    }
-    const openai = createOpenAI({
-      baseURL: "https://api.hyperbolic.xyz/v1/",
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
-class AmazonBedrockProvider extends BaseProvider {
-  name = "AmazonBedrock";
-  getApiKeyLink = "https://console.aws.amazon.com/iam/home";
-  config = {
-    apiTokenKey: "AWS_BEDROCK_CONFIG"
-  };
-  staticModels = [
-    {
-      name: "anthropic.claude-3-5-sonnet-20241022-v2:0",
-      label: "Claude 3.5 Sonnet v2 (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 2e5
-    },
-    {
-      name: "anthropic.claude-3-5-sonnet-20240620-v1:0",
-      label: "Claude 3.5 Sonnet (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 4096
-    },
-    {
-      name: "anthropic.claude-3-sonnet-20240229-v1:0",
-      label: "Claude 3 Sonnet (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 4096
-    },
-    {
-      name: "anthropic.claude-3-haiku-20240307-v1:0",
-      label: "Claude 3 Haiku (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 4096
-    },
-    {
-      name: "amazon.nova-pro-v1:0",
-      label: "Amazon Nova Pro (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 5120
-    },
-    {
-      name: "amazon.nova-lite-v1:0",
-      label: "Amazon Nova Lite (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 5120
-    },
-    {
-      name: "mistral.mistral-large-2402-v1:0",
-      label: "Mistral Large 24.02 (Bedrock)",
-      provider: "AmazonBedrock",
-      maxTokenAllowed: 8192
-    }
-  ];
-  _parseAndValidateConfig(apiKey) {
-    let parsedConfig;
-    try {
-      parsedConfig = JSON.parse(apiKey);
-    } catch {
-      throw new Error(
-        "Invalid AWS Bedrock configuration format. Please provide a valid JSON string containing region, accessKeyId, and secretAccessKey."
-      );
-    }
-    const { region, accessKeyId, secretAccessKey, sessionToken } = parsedConfig;
-    if (!region || !accessKeyId || !secretAccessKey) {
-      throw new Error(
-        "Missing required AWS credentials. Configuration must include region, accessKeyId, and secretAccessKey."
-      );
-    }
-    return {
-      region,
-      accessKeyId,
-      secretAccessKey,
-      ...sessionToken && { sessionToken }
-    };
-  }
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "AWS_BEDROCK_CONFIG"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const config = this._parseAndValidateConfig(apiKey);
-    const bedrock = createAmazonBedrock(config);
-    return bedrock(model);
-  }
-}
-
-class GithubProvider extends BaseProvider {
-  name = "Github";
-  getApiKeyLink = "https://github.com/settings/personal-access-tokens";
-  config = {
-    apiTokenKey: "GITHUB_API_KEY"
-  };
-  // find more in https://github.com/marketplace?type=models
-  staticModels = [
-    { name: "gpt-4o", label: "GPT-4o", provider: "Github", maxTokenAllowed: 8e3 },
-    { name: "o1", label: "o1-preview", provider: "Github", maxTokenAllowed: 1e5 },
-    { name: "o1-mini", label: "o1-mini", provider: "Github", maxTokenAllowed: 8e3 },
-    { name: "gpt-4o-mini", label: "GPT-4o Mini", provider: "Github", maxTokenAllowed: 8e3 },
-    { name: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "Github", maxTokenAllowed: 8e3 },
-    { name: "gpt-4", label: "GPT-4", provider: "Github", maxTokenAllowed: 8e3 },
-    { name: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", provider: "Github", maxTokenAllowed: 8e3 }
-  ];
-  getModelInstance(options) {
-    const { model, serverEnv, apiKeys, providerSettings } = options;
-    const { apiKey } = this.getProviderBaseUrlAndKey({
-      apiKeys,
-      providerSettings: providerSettings?.[this.name],
-      serverEnv,
-      defaultBaseUrlKey: "",
-      defaultApiTokenKey: "GITHUB_API_KEY"
-    });
-    if (!apiKey) {
-      throw new Error(`Missing API key for ${this.name} provider`);
-    }
-    const openai = createOpenAI({
-      baseURL: "https://models.inference.ai.azure.com",
-      apiKey
-    });
-    return openai(model);
-  }
-}
-
 const providers = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  AmazonBedrockProvider,
-  AnthropicProvider,
-  CohereProvider,
-  DeepseekProvider,
-  GithubProvider,
-  GoogleProvider,
-  GroqProvider,
-  HuggingFaceProvider,
-  HyperbolicProvider,
-  LMStudioProvider,
-  MistralProvider,
-  OllamaProvider,
-  OpenAILikeProvider,
-  OpenAIProvider,
-  OpenRouterProvider,
-  PerplexityProvider,
-  TogetherProvider,
-  XAIProvider
+  AnthropicProvider
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const logger$6 = createScopedLogger("LLMManager");
+const logger$7 = createScopedLogger("LLMManager");
 class LLMManager {
   static _instance;
   _providers = /* @__PURE__ */ new Map();
@@ -1926,20 +1183,20 @@ class LLMManager {
           try {
             this.registerProvider(provider);
           } catch (error) {
-            logger$6.warn("Failed To Register Provider: ", provider.name, "error:", error.message);
+            logger$7.warn("Failed To Register Provider: ", provider.name, "error:", error.message);
           }
         }
       }
     } catch (error) {
-      logger$6.error("Error registering providers:", error);
+      logger$7.error("Error registering providers:", error);
     }
   }
   registerProvider(provider) {
     if (this._providers.has(provider.name)) {
-      logger$6.warn(`Provider ${provider.name} is already registered. Skipping.`);
+      logger$7.warn(`Provider ${provider.name} is already registered. Skipping.`);
       return;
     }
-    logger$6.info("Registering Provider: ", provider.name);
+    logger$7.info("Registering Provider: ", provider.name);
     this._providers.set(provider.name, provider);
     this._modelList = [...this._modelList, ...provider.staticModels];
   }
@@ -1967,11 +1224,11 @@ class LLMManager {
           return cachedModels;
         }
         const dynamicModels2 = await provider.getDynamicModels(apiKeys, providerSettings?.[provider.name], serverEnv).then((models) => {
-          logger$6.info(`Caching ${models.length} dynamic models for ${provider.name}`);
+          logger$7.info(`Caching ${models.length} dynamic models for ${provider.name}`);
           provider.storeDynamicModels(options, models);
           return models;
         }).catch((err) => {
-          logger$6.error(`Error getting dynamic models ${provider.name} :`, err);
+          logger$7.error(`Error getting dynamic models ${provider.name} :`, err);
           return [];
         });
         return dynamicModels2;
@@ -2005,16 +1262,16 @@ class LLMManager {
       serverEnv
     });
     if (cachedModels) {
-      logger$6.info(`Found ${cachedModels.length} cached models for ${provider.name}`);
+      logger$7.info(`Found ${cachedModels.length} cached models for ${provider.name}`);
       return [...cachedModels, ...staticModels];
     }
-    logger$6.info(`Getting dynamic models for ${provider.name}`);
+    logger$7.info(`Getting dynamic models for ${provider.name}`);
     const dynamicModels = await provider.getDynamicModels?.(apiKeys, providerSettings?.[provider.name], serverEnv).then((models) => {
-      logger$6.info(`Got ${models.length} dynamic models for ${provider.name}`);
+      logger$7.info(`Got ${models.length} dynamic models for ${provider.name}`);
       provider.storeDynamicModels(options, models);
       return models;
     }).catch((err) => {
-      logger$6.error(`Error getting dynamic models ${provider.name} :`, err);
+      logger$7.error(`Error getting dynamic models ${provider.name} :`, err);
       return [];
     });
     const dynamicModelsName = dynamicModels.map((d) => d.name);
@@ -2097,7 +1354,7 @@ async function loader$8({
   const cookieHeader = request.headers.get("Cookie");
   const apiKeys = getApiKeysFromCookie(cookieHeader);
   const providerSettings = getProviderSettingsFromCookie(cookieHeader);
-  const { providers, defaultProvider } = getProviderInfo(llmManager);
+  const { providers} = getProviderInfo(llmManager);
   let modelList = [];
   if (params.provider) {
     const provider = llmManager.getProvider(params.provider);
@@ -2115,19 +1372,25 @@ async function loader$8({
       serverEnv: context.cloudflare?.env
     });
   }
+  const anthropicProvider = providers.find((p) => p.name === "Anthropic");
+  const anthropicModels = modelList.filter((m) => m.provider === "Anthropic");
+  if (!anthropicProvider) {
+    throw new Error("Anthropic provider not found");
+  }
+  const filteredProviders = [anthropicProvider];
   return json({
-    modelList,
-    providers,
-    defaultProvider
+    modelList: anthropicModels,
+    providers: filteredProviders,
+    defaultProvider: anthropicProvider
   });
 }
 
-const route11 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route17 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$8
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$8
 }, Symbol.toStringTag, { value: 'Module' }));
@@ -2222,7 +1485,7 @@ const loader$7 = async ({ request: _request }) => {
     );
   }
 };
-const action$6 = async ({ request: _request }) => {
+const action$b = async ({ request: _request }) => {
   try {
     return json(getAppResponse());
   } catch (error) {
@@ -2257,9 +1520,9 @@ const action$6 = async ({ request: _request }) => {
   }
 };
 
-const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$6,
+  action: action$b,
   loader: loader$7
 }, Symbol.toStringTag, { value: 'Module' }));
 
@@ -2353,9 +1616,92 @@ const loader$6 = async ({ request: _request }) => {
   return json(response);
 };
 
-const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route6 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$6
+}, Symbol.toStringTag, { value: 'Module' }));
+
+async function action$a({ request }) {
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response("No authorization token provided", { status: 401 });
+  }
+  try {
+    const { projectId, query } = await request.json();
+    console.log("Executing query:", { projectId, query });
+    const response = await fetch(`https://api.supabase.com/v1/projects/${projectId}/database/query`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        console.log(e);
+        errorData = { message: errorText };
+      }
+      console.error(
+        "Supabase API error:",
+        JSON.stringify({
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+      );
+      return new Response(
+        JSON.stringify({
+          error: {
+            status: response.status,
+            statusText: response.statusText,
+            message: errorData.message || errorData.error || errorText,
+            details: errorData
+          }
+        }),
+        {
+          status: response.status,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+    const result = await response.json();
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+  } catch (error) {
+    console.error("Query execution error:", error);
+    return new Response(
+      JSON.stringify({
+        error: {
+          message: error instanceof Error ? error.message : "Query execution failed",
+          stack: error instanceof Error ? error.stack : void 0
+        }
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  }
+}
+
+const route7 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$a
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const __vite_import_meta_env__$1 = {"BASE_URL": "/", "DEV": false, "MODE": "production", "PROD": true, "SSR": true};
@@ -2364,7 +1710,7 @@ const WORK_DIR = `/home/${WORK_DIR_NAME}`;
 const MODIFICATIONS_TAG_NAME = "bolt_file_modifications";
 const MODEL_REGEX = /^\[Model: (.*?)\]\n\n/;
 const PROVIDER_REGEX = /\[Provider: (.*?)\]\n\n/;
-const DEFAULT_MODEL = "claude-3-5-sonnet-latest";
+const DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
 const llmManager = LLMManager.getInstance(__vite_import_meta_env__$1);
 const PROVIDER_LIST = llmManager.getAllProviders();
 const DEFAULT_PROVIDER = llmManager.getDefaultProvider();
@@ -2469,20 +1815,18 @@ const STARTER_TEMPLATES = [
 const loader$5 = async ({ context, request }) => {
   const url = new URL(request.url);
   const provider = url.searchParams.get("provider");
-  if (!provider || !providerBaseUrlEnvKeys[provider].apiTokenKey) {
-    return Response.json({ isSet: false });
+  if (provider === "Anthropic") {
+    return Response.json({ isSet: true });
   }
-  const envVarName = providerBaseUrlEnvKeys[provider].apiTokenKey;
-  const isSet = !!(process.env[envVarName] || context?.cloudflare?.env?.[envVarName]);
-  return Response.json({ isSet });
+  return Response.json({ isSet: false });
 };
 
-const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route8 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$5
 }, Symbol.toStringTag, { value: 'Module' }));
 
-async function action$5({ request, params }) {
+async function action$9({ request, params }) {
   return handleProxyRequest(request, params["*"]);
 }
 async function loader$4({ request, params }) {
@@ -2529,10 +1873,437 @@ async function handleProxyRequest(request, path) {
   }
 }
 
-const route6 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route9 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$5,
+  action: action$9,
   loader: loader$4
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const VerificationCodePopup = ({
+  isOpen,
+  onClose,
+  email,
+  onVerifySuccess
+}) => {
+  const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  if (!isOpen) return null;
+  const handleCodeChange = (index, value) => {
+    if (value && !/^\d+$/.test(value)) {
+      return;
+    }
+    const newCode = [...code];
+    if (value.length > 1 && index === 0) {
+      if (value.length === 6 && /^\d+$/.test(value)) {
+        const digits = value.split("");
+        setCode(digits);
+        const lastInput = document.getElementById(`code-input-5`);
+        if (lastInput) {
+          lastInput.focus();
+        }
+        return;
+      }
+    }
+    newCode[index] = value;
+    setCode(newCode);
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`code-input-${index + 1}`);
+      if (nextInput) {
+        nextInput.focus();
+      }
+    }
+  };
+  const handleKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      const prevInput = document.getElementById(`code-input-${index - 1}`);
+      if (prevInput) {
+        prevInput.focus();
+      }
+    }
+  };
+  const handleVerifyCode = async () => {
+    const verificationCode = code.join("");
+    if (verificationCode.length !== 6) {
+      setError("Please enter a 6-digit verification code");
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/verify-reset-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          code: verificationCode
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        setError(data.msg || "Invalid verification code. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      onVerifySuccess();
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return /* @__PURE__ */ jsx("div", { className: "fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4", children: /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] rounded-lg p-8 w-full max-w-md relative border border-gray-800", children: [
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: onClose,
+        className: "absolute top-4 right-4 text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0",
+        children: /* @__PURE__ */ jsx("div", { className: "i-ph:x text-xl" })
+      }
+    ),
+    /* @__PURE__ */ jsxs("div", { className: "text-center mb-8", children: [
+      /* @__PURE__ */ jsx("h2", { className: "text-2xl font-bold text-white mb-2", children: "Verify Code" }),
+      /* @__PURE__ */ jsxs("p", { className: "text-gray-300", children: [
+        "Enter the 6-digit code sent to ",
+        email
+      ] })
+    ] }),
+    error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+    /* @__PURE__ */ jsxs("div", { className: "space-y-6", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx("label", { className: "text-gray-200 block", children: "Verification Code" }),
+        /* @__PURE__ */ jsx("div", { className: "flex justify-between gap-2", children: code.map((digit, index) => /* @__PURE__ */ jsx(
+          "input",
+          {
+            id: `code-input-${index}`,
+            type: "text",
+            maxLength: 1,
+            className: "w-full aspect-square text-center px-0 py-2 bg-[#0a0a0c] border border-gray-800 text-white text-xl font-bold focus:border-blue-500 focus:ring-blue-500 rounded-md",
+            value: digit,
+            onChange: (e) => handleCodeChange(index, e.target.value),
+            onKeyDown: (e) => handleKeyDown(index, e),
+            autoFocus: index === 0
+          },
+          index
+        )) })
+      ] }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleVerifyCode,
+          className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md",
+          disabled: isLoading,
+          children: isLoading ? "Verifying..." : "Verify Code"
+        }
+      ),
+      /* @__PURE__ */ jsx("div", { className: "text-center mt-4", children: /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: onClose,
+          className: "text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0",
+          children: "Cancel"
+        }
+      ) })
+    ] })
+  ] }) });
+};
+
+const PasswordResetPopup = ({
+  isOpen,
+  onClose,
+  email,
+  onResetSuccess
+}) => {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  if (!isOpen) return null;
+  const validatePassword = (password2) => {
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    return passwordRegex.test(password2);
+  };
+  const handleResetPassword = async () => {
+    if (!password || !confirmPassword) {
+      setError("Both password fields are required");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (!validatePassword(password)) {
+      setError("Password must be at least 8 characters long and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character");
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/reset/password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        setError(data.msg || "Failed to reset password. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      onResetSuccess();
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return /* @__PURE__ */ jsx("div", { className: "fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4", children: /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] rounded-lg p-8 w-full max-w-md relative border border-gray-800", children: [
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: onClose,
+        className: "absolute top-4 right-4 text-gray-400 hover:text-white",
+        children: /* @__PURE__ */ jsx("div", { className: "i-ph:x text-xl" })
+      }
+    ),
+    /* @__PURE__ */ jsxs("div", { className: "text-center mb-8", children: [
+      /* @__PURE__ */ jsx("h2", { className: "text-2xl font-bold text-white mb-2", children: "Reset Password" }),
+      /* @__PURE__ */ jsxs("p", { className: "text-gray-300", children: [
+        "Create a new password for ",
+        email
+      ] })
+    ] }),
+    error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+    /* @__PURE__ */ jsxs("div", { className: "space-y-6", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "text-gray-200 block", children: "New Password" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            id: "password",
+            type: "password",
+            className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 rounded-md",
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            autoFocus: true
+          }
+        ),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400 mt-1", children: "Password must be at least 8 characters long and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character." })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx("label", { htmlFor: "confirmPassword", className: "text-gray-200 block", children: "Confirm New Password" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            id: "confirmPassword",
+            type: "password",
+            className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500 rounded-md",
+            value: confirmPassword,
+            onChange: (e) => setConfirmPassword(e.target.value)
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleResetPassword,
+          className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md",
+          disabled: isLoading,
+          children: isLoading ? "Resetting..." : "Reset Password"
+        }
+      ),
+      /* @__PURE__ */ jsx("div", { className: "text-center mt-4", children: /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: onClose,
+          className: "text-gray-400 hover:text-white",
+          children: "Cancel"
+        }
+      ) })
+    ] })
+  ] }) });
+};
+
+const action$8 = async ({ request }) => {
+  const formData = await request.formData();
+  const email = formData.get("email");
+  if (!email) {
+    return json({ error: "Email is required" });
+  }
+  try {
+    const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/send-reset-code", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email })
+    });
+    const data = await response.json();
+    if (response.status === 201 && data.status) {
+      return json({ success: true, message: data.msg, email });
+    } else {
+      return json({ error: data.msg });
+    }
+  } catch (error) {
+    console.error("Error sending reset code:", error);
+    return json({ error: "Failed to send reset code. Please try again." });
+  }
+};
+function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [showPasswordResetPopup, setShowPasswordResetPopup] = useState(false);
+  const navigate = useNavigate();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/send-reset-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+      if (response.status === 201 && data.status) {
+        setSuccess("Reset code sent successfully. Please check your email.");
+        setShowVerificationPopup(true);
+      } else {
+        setError(data.msg);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleVerificationSuccess = () => {
+    setShowVerificationPopup(false);
+    setShowPasswordResetPopup(true);
+  };
+  const handleResetSuccess = () => {
+    setShowPasswordResetPopup(false);
+    setSuccess("Password reset successfully. You will be redirected to login.");
+    setTimeout(() => {
+      navigate("/login");
+    }, 3e3);
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col bg-[#0a0a0c] bg-gradient-to-br from-[#0a0a0c] via-[#0d1117] to-[#131c2e] relative", children: [
+    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-[url('data:image/svg+xml;base64PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAuMDUiPjxwYXRoIGQ9Ik0yMCAyMGgyMHYyMEgyMHoiLz48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PC9nPjwvc3ZnPg==')] opacity-50" }),
+    /* @__PURE__ */ jsx("header", { className: "p-4 relative", children: /* @__PURE__ */ jsx("div", { className: "container mx-auto", children: /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxs("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "12", stroke: "white", strokeWidth: "1.5" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "3", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "9", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "23", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "9", cy: "16", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "23", cy: "16", r: "1.5", fill: "white" })
+      ] }),
+      /* @__PURE__ */ jsx("span", { className: "text-white text-xl font-semibold", children: "Ada" })
+    ] }) }) }),
+    /* @__PURE__ */ jsx("main", { className: "flex-1 flex items-center justify-center p-6 relative", children: /* @__PURE__ */ jsxs("div", { className: "w-full max-w-md space-y-8", children: [
+      /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-4xl font-bold text-white", children: "Reset Password" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-gray-400", children: "Enter your email to receive a password reset code" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] bg-opacity-50 backdrop-blur-sm rounded-lg p-8 shadow-2xl border border-gray-800", children: [
+        error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+        success && /* @__PURE__ */ jsx("div", { className: "bg-green-500 text-white p-3 rounded-md mb-4", children: success }),
+        /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-6", children: [
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "text-gray-200 block", children: "Email" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "email",
+                name: "email",
+                type: "email",
+                autoComplete: "email",
+                placeholder: "your@email.com",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true,
+                value: email,
+                onChange: (e) => setEmail(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              type: "submit",
+              className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md",
+              disabled: isLoading,
+              children: isLoading ? "Sending..." : "Send Reset Code"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "mt-6 text-center", children: [
+          /* @__PURE__ */ jsxs("p", { className: "text-gray-400", children: [
+            "Remember your password?",
+            " ",
+            /* @__PURE__ */ jsx(Link, { to: "/login", className: "text-gray-200 hover:text-white", children: "Sign in" })
+          ] }),
+          /* @__PURE__ */ jsxs("p", { className: "mt-4 text-gray-400", children: [
+            "Already have a code?",
+            " ",
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => setShowVerificationPopup(true),
+                className: "text-gray-200 hover:text-white bg-transparent border-none p-0 cursor-pointer",
+                children: "Enter verification code"
+              }
+            )
+          ] })
+        ] })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsx("footer", { className: "py-4 relative", children: /* @__PURE__ */ jsxs("div", { className: "container mx-auto text-center text-gray-500 text-sm", children: [
+      "© ",
+      (/* @__PURE__ */ new Date()).getFullYear(),
+      " Ada. All rights reserved."
+    ] }) }),
+    /* @__PURE__ */ jsx(
+      VerificationCodePopup,
+      {
+        isOpen: showVerificationPopup,
+        onClose: () => setShowVerificationPopup(false),
+        email,
+        onVerifySuccess: handleVerificationSuccess
+      }
+    ),
+    /* @__PURE__ */ jsx(
+      PasswordResetPopup,
+      {
+        isOpen: showPasswordResetPopup,
+        onClose: () => setShowPasswordResetPopup(false),
+        email,
+        onResetSuccess: handleResetSuccess
+      }
+    )
+  ] });
+}
+
+const route10 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$8,
+  default: ForgotPasswordPage
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const MAX_TOKENS = 8e3;
@@ -2713,6 +2484,32 @@ You are Ada, an expert AI assistant and exceptional senior software developer wi
   [Rest of response...]"
 
 </chain_of_thought_instructions>
+
+<code_review_instructions>
+  ALWAYS review code before execution. For any code that will be executed (whether in shell commands, file creation, or other contexts), perform these checks:
+  
+  1. Syntax Check:
+     - Verify correct syntax for the language/framework
+     - Check for missing brackets, semicolons, or other syntax elements
+     - Ensure proper indentation and formatting
+  
+  2. Logic Review:
+     - Identify potential logical errors or bugs
+     - Check for edge cases that might cause issues
+     - Verify that the code will accomplish its intended purpose
+  
+  3. Security Analysis:
+     - Look for potential security vulnerabilities
+     - Check for unsafe practices (e.g., unsanitized inputs)
+     - Identify any permissions or access issues
+  
+  4. Best Practices:
+     - Ensure code follows language/framework best practices
+     - Check for inefficient patterns or anti-patterns
+     - Verify proper error handling
+  
+  Only after completing this review should you proceed with executing or suggesting the execution of code. If issues are found, fix them before proceeding.
+</code_review_instructions>
 
 <artifact_info>
   Ada creates a SINGLE, comprehensive artifact for each project. The artifact contains all necessary steps and components, including:
@@ -3174,7 +2971,7 @@ function extractCurrentContext(messages) {
 }
 
 const ig$2 = ignore().add(IGNORE_PATTERNS$2);
-const logger$5 = createScopedLogger("select-context");
+const logger$6 = createScopedLogger("select-context");
 async function selectContext(props) {
   const { messages, env: serverEnv, apiKeys, files, providerSettings, summary, onFinish } = props;
   let currentModel = DEFAULT_MODEL;
@@ -3211,7 +3008,7 @@ async function selectContext(props) {
     }
     modelDetails = modelsList.find((m) => m.name === currentModel);
     if (!modelDetails) {
-      logger$5.warn(
+      logger$6.warn(
         `MODEL [${currentModel}] not found in provider [${provider.name}]. Falling back to first model. ${modelsList[0].name}`
       );
       modelDetails = modelsList[0];
@@ -3319,7 +3116,7 @@ async function selectContext(props) {
       fullPath = `/home/project/${path}`;
     }
     if (!filePaths.includes(fullPath)) {
-      logger$5.error(`File ${path} is not in the list of files above.`);
+      logger$6.error(`File ${path} is not in the list of files above.`);
       return;
     }
     if (currrentFiles.includes(path)) {
@@ -3331,9 +3128,9 @@ async function selectContext(props) {
     onFinish(resp);
   }
   const totalFiles = Object.keys(filteredFiles).length;
-  logger$5.info(`Total files: ${totalFiles}`);
+  logger$6.info(`Total files: ${totalFiles}`);
   if (totalFiles == 0) {
-    throw new Error(`Bolt failed to select files`);
+    throw new Error(`Ada failed to select files`);
   }
   return filteredFiles;
 }
@@ -3346,7 +3143,7 @@ function getFilePaths(files) {
   return filePaths;
 }
 
-const logger$4 = createScopedLogger("stream-text");
+const logger$5 = createScopedLogger("stream-text");
 async function streamText(props) {
   const {
     messages,
@@ -3361,12 +3158,11 @@ async function streamText(props) {
     summary
   } = props;
   let currentModel = DEFAULT_MODEL;
-  let currentProvider = DEFAULT_PROVIDER.name;
+  DEFAULT_PROVIDER.name;
   let processedMessages = messages.map((message) => {
     if (message.role === "user") {
-      const { model, provider: provider2, content } = extractPropertiesFromMessage(message);
+      const { model, content } = extractPropertiesFromMessage(message);
       currentModel = model;
-      currentProvider = provider2;
       return { ...message, content };
     } else if (message.role == "assistant") {
       let content = message.content;
@@ -3376,7 +3172,7 @@ async function streamText(props) {
     }
     return message;
   });
-  const provider = PROVIDER_LIST.find((p) => p.name === currentProvider) || DEFAULT_PROVIDER;
+  const provider = PROVIDER_LIST.find((p) => p.name === "Anthropic") || DEFAULT_PROVIDER;
   const staticModels = LLMManager.getInstance().getStaticModelListFromProvider(provider);
   let modelDetails = staticModels.find((m) => m.name === currentModel);
   if (!modelDetails) {
@@ -3393,7 +3189,7 @@ async function streamText(props) {
     }
     modelDetails = modelsList.find((m) => m.name === currentModel);
     if (!modelDetails) {
-      logger$4.warn(
+      logger$5.warn(
         `MODEL [${currentModel}] not found in provider [${provider.name}]. Falling back to first model. ${modelsList[0].name}`
       );
       modelDetails = modelsList[0];
@@ -3438,25 +3234,66 @@ ${props.summary}
       }
     }
   }
-  logger$4.info(`Sending llm call to ${provider.name} with model ${modelDetails.name}`);
-  return await streamText$1({
-    model: provider.getModelInstance({
-      model: modelDetails.name,
-      serverEnv,
-      apiKeys,
-      providerSettings
-    }),
-    system: systemPrompt,
-    maxTokens: dynamicMaxTokens,
-    messages: convertToCoreMessages(processedMessages),
-    ...options
-  });
+  logger$5.info(`Sending llm call to ${provider.name} with model ${modelDetails.name}`);
+  try {
+    const result = await streamText$1({
+      model: provider.getModelInstance({
+        model: modelDetails.name,
+        serverEnv,
+        apiKeys,
+        providerSettings
+      }),
+      system: systemPrompt,
+      maxTokens: dynamicMaxTokens,
+      messages: convertToCoreMessages(processedMessages),
+      ...options
+    });
+    result.usage.then((usage) => {
+      logger$5.info(`Raw usage from stream: ${JSON.stringify(usage)}`);
+      if (usage) {
+        const tokenUsage = {
+          promptTokens: usage.promptTokens || 0,
+          completionTokens: usage.completionTokens || 0,
+          totalTokens: usage.totalTokens || 0
+        };
+        if (provider.name === "OpenAI" && (tokenUsage.promptTokens === 0 || tokenUsage.completionTokens === 0)) {
+          const promptChars = systemPrompt.length + processedMessages.reduce((sum, msg) => sum + (typeof msg.content === "string" ? msg.content.length : 0), 0);
+          const estimatedResponseChars = 1e3;
+          tokenUsage.promptTokens = tokenUsage.promptTokens || Math.ceil(promptChars / 4);
+          tokenUsage.completionTokens = tokenUsage.completionTokens || Math.ceil(estimatedResponseChars / 4);
+          tokenUsage.totalTokens = tokenUsage.promptTokens + tokenUsage.completionTokens;
+          logger$5.info(`Estimated token usage for OpenAI stream: ${JSON.stringify(tokenUsage)}`);
+        }
+        logger$5.info(`Stream completed. Token usage: ${JSON.stringify(tokenUsage)}`);
+      }
+    }).catch((err) => {
+      logger$5.warn(`Failed to get token usage: ${err.message}`);
+    });
+    return result;
+  } catch (error) {
+    if (error.message?.includes("rate limit") || error.statusCode === 429) {
+      logger$5.error(`Rate limit exceeded: ${error.message}`);
+      const encoder = new TextEncoder();
+      const errorMessage = "ERROR: Rate limit exceeded. Please try again later or switch to a different model.";
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(errorMessage));
+          controller.close();
+        }
+      });
+      return {
+        textStream: stream,
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0, totalTokens: 0 })
+      };
+    }
+    throw error;
+  }
 }
 
-async function action$4(args) {
+async function action$7(args) {
   return enhancerAction(args);
 }
-const logger$3 = createScopedLogger("api.enhancher");
+const logger$4 = createScopedLogger("api.enhancher");
 async function enhancerAction({ context, request }) {
   const { message, model, provider } = await request.json();
   const { name: providerName } = provider;
@@ -3533,7 +3370,7 @@ async function enhancerAction({ context, request }) {
       for await (const part of result.fullStream) {
         if (part.type === "error") {
           const error = part.error;
-          logger$3.error(error);
+          logger$4.error(error);
           return;
         }
       }
@@ -3562,20 +3399,69 @@ async function enhancerAction({ context, request }) {
   }
 }
 
-const route7 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route11 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$4
+  action: action$7
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const action$6 = async ({ request }) => {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, { status: 405 });
+  }
+  try {
+    const { token } = await request.json();
+    const projectsResponse = await fetch("https://api.supabase.com/v1/projects", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!projectsResponse.ok) {
+      const errorText = await projectsResponse.text();
+      console.error("Projects fetch failed:", errorText);
+      return json({ error: "Failed to fetch projects" }, { status: 401 });
+    }
+    const projects = await projectsResponse.json();
+    const uniqueProjectsMap = /* @__PURE__ */ new Map();
+    for (const project of projects) {
+      if (!uniqueProjectsMap.has(project.id)) {
+        uniqueProjectsMap.set(project.id, project);
+      }
+    }
+    const uniqueProjects = Array.from(uniqueProjectsMap.values());
+    uniqueProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return json({
+      user: { email: "Connected", role: "Admin" },
+      stats: {
+        projects: uniqueProjects,
+        totalProjects: uniqueProjects.length
+      }
+    });
+  } catch (error) {
+    console.error("Supabase API error:", error);
+    return json(
+      {
+        error: error instanceof Error ? error.message : "Authentication failed"
+      },
+      { status: 401 }
+    );
+  }
+};
+
+const route12 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$6
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const __vite_import_meta_env__ = {"BASE_URL": "/", "DEV": false, "MODE": "production", "PROD": true, "SSR": true};
-async function action$3(args) {
+async function action$5(args) {
   return llmCallAction(args);
 }
 async function getModelList(options) {
   const llmManager = LLMManager.getInstance(__vite_import_meta_env__);
   return llmManager.updateModelList(options);
 }
-const logger$2 = createScopedLogger("api.llmcall");
+const logger$3 = createScopedLogger("api.llmcall");
 async function llmCallAction({ context, request }) {
   const { system, message, model, provider, streamOutput } = await request.json();
   const { name: providerName } = provider;
@@ -3637,35 +3523,70 @@ async function llmCallAction({ context, request }) {
         throw new Error("Model not found");
       }
       const dynamicMaxTokens = modelDetails && modelDetails.maxTokenAllowed ? modelDetails.maxTokenAllowed : MAX_TOKENS;
-      const providerInfo = PROVIDER_LIST.find((p) => p.name === provider.name);
+      const providerInfo = PROVIDER_LIST.find((p) => p.name === "Anthropic");
       if (!providerInfo) {
-        throw new Error("Provider not found");
+        throw new Error("Anthropic provider not found");
       }
-      logger$2.info(`Generating response Provider: ${provider.name}, Model: ${modelDetails.name}`);
-      const result = await generateText({
-        system,
-        messages: [
-          {
-            role: "user",
-            content: `${message}`
-          }
-        ],
-        model: providerInfo.getModelInstance({
-          model: modelDetails.name,
-          serverEnv: context.cloudflare?.env,
-          apiKeys,
-          providerSettings
-        }),
-        maxTokens: dynamicMaxTokens,
-        toolChoice: "none"
-      });
-      logger$2.info(`Generated response`);
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json"
+      logger$3.info(`Generating response Provider: ${provider.name}, Model: ${modelDetails.name}`);
+      try {
+        const result = await generateText({
+          system,
+          messages: [
+            {
+              role: "user",
+              content: `${message}`
+            }
+          ],
+          model: providerInfo.getModelInstance({
+            model: modelDetails.name,
+            serverEnv: context.cloudflare?.env,
+            apiKeys,
+            providerSettings
+          }),
+          maxTokens: dynamicMaxTokens,
+          toolChoice: "none"
+        });
+        logger$3.info(`Raw result: ${JSON.stringify(result)}`);
+        logger$3.info(`Raw usage: ${JSON.stringify(result.usage)}`);
+        const tokenUsage = {
+          promptTokens: result.usage?.promptTokens || 0,
+          completionTokens: result.usage?.completionTokens || 0,
+          totalTokens: result.usage?.totalTokens || 0
+        };
+        if (provider.name === "OpenAI" && (tokenUsage.promptTokens === 0 || tokenUsage.completionTokens === 0)) {
+          const promptChars = (system?.length || 0) + (message?.length || 0);
+          const responseChars = result.text?.length || 0;
+          tokenUsage.promptTokens = tokenUsage.promptTokens || Math.ceil(promptChars / 4);
+          tokenUsage.completionTokens = tokenUsage.completionTokens || Math.ceil(responseChars / 4);
+          tokenUsage.totalTokens = tokenUsage.promptTokens + tokenUsage.completionTokens;
+          logger$3.info(`Estimated token usage for OpenAI: ${JSON.stringify(tokenUsage)}`);
         }
-      });
+        logger$3.info(`Final token usage: ${JSON.stringify(tokenUsage)}`);
+        return new Response(JSON.stringify({
+          ...result,
+          usage: tokenUsage
+        }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+      } catch (error) {
+        if (error.message?.includes("rate limit") || error.statusCode === 429) {
+          logger$3.error(`Rate limit exceeded: ${error.message}`);
+          return new Response(JSON.stringify({
+            error: "Rate limit exceeded",
+            message: "You have exceeded the rate limit for this model. Please try again later or switch to a different model.",
+            details: error.message
+          }), {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        throw error;
+      }
     } catch (error) {
       console.log(error);
       if (error instanceof Error && error.message?.includes("API key")) {
@@ -3682,12 +3603,41 @@ async function llmCallAction({ context, request }) {
   }
 }
 
-const route8 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route13 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$3
+  action: action$5
 }, Symbol.toStringTag, { value: 'Module' }));
 
-async function action$2({ request }) {
+function VerifyCodeRedirect() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const email = searchParams.get("email") || "";
+  useEffect(() => {
+    navigate(`/reset-code-verification?email=${encodeURIComponent(email)}`);
+  }, [navigate, email]);
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col items-center justify-center bg-[#0a0a0c]", children: [
+    /* @__PURE__ */ jsx("h1", { className: "text-2xl text-white mb-4", children: "Redirecting..." }),
+    /* @__PURE__ */ jsxs("p", { className: "text-gray-400", children: [
+      "If you are not redirected automatically, click",
+      " ",
+      /* @__PURE__ */ jsx(
+        "a",
+        {
+          href: `/reset-code-verification?email=${encodeURIComponent(email)}`,
+          className: "text-blue-500 hover:text-blue-400",
+          children: "here"
+        }
+      )
+    ] })
+  ] });
+}
+
+const route14 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: VerifyCodeRedirect
+}, Symbol.toStringTag, { value: 'Module' }));
+
+async function action$4({ request }) {
   try {
     const { siteId, files, token, chatId } = await request.json();
     if (!token) {
@@ -3872,9 +3822,9 @@ async function action$2({ request }) {
   }
 }
 
-const route9 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route15 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$2
+  action: action$4
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const loader$3 = async ({ request: _request }) => {
@@ -3893,13 +3843,13 @@ const loader$3 = async ({ request: _request }) => {
   );
 };
 
-const route10 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route16 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$3
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const execAsync = promisify(exec);
-const action$1 = async ({ request }) => {
+const action$3 = async ({ request }) => {
   if (request.method !== "POST") {
     return json$1({ error: "Method not allowed" }, { status: 405 });
   }
@@ -4341,9 +4291,9 @@ ${commits2.join("\n")}
   }
 }
 
-const route12 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route18 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action: action$1
+  action: action$3
 }, Symbol.toStringTag, { value: 'Module' }));
 
 class SwitchableStream extends TransformStream {
@@ -4398,7 +4348,7 @@ class SwitchableStream extends TransformStream {
   }
 }
 
-const logger$1 = createScopedLogger("create-summary");
+const logger$2 = createScopedLogger("create-summary");
 async function createSummary(props) {
   const { messages, env: serverEnv, apiKeys, providerSettings, onFinish } = props;
   let currentModel = DEFAULT_MODEL;
@@ -4435,7 +4385,7 @@ async function createSummary(props) {
     }
     modelDetails = modelsList.find((m) => m.name === currentModel);
     if (!modelDetails) {
-      logger$1.warn(
+      logger$2.warn(
         `MODEL [${currentModel}] not found in provider [${provider.name}]. Falling back to first model. ${modelsList[0].name}`
       );
       modelDetails = modelsList[0];
@@ -4461,7 +4411,7 @@ ${summary.summary}`;
       slicedMessages = processedMessages.slice(index + 1);
     }
   }
-  logger$1.debug("Sliced Messages:", slicedMessages.length);
+  logger$2.debug("Sliced Messages:", slicedMessages.length);
   const extractTextContent = (message) => Array.isArray(message.content) ? message.content.find((item) => item.type === "text")?.text || "" : message.content;
   const resp = await generateText({
     system: `
@@ -4556,10 +4506,10 @@ Please provide a summary of the chat till now including the hitorical summary of
   return response;
 }
 
-async function action(args) {
+async function action$2(args) {
   return chatAction(args);
 }
-const logger = createScopedLogger("api.chat");
+const logger$1 = createScopedLogger("api.chat");
 function parseCookies(cookieHeader) {
   const cookies = {};
   const items = cookieHeader.split(";").map((cookie) => cookie.trim());
@@ -4590,7 +4540,7 @@ async function chatAction({ context, request }) {
   let progressCounter = 1;
   try {
     const totalMessageContent = messages.reduce((acc, message) => acc + message.content, "");
-    logger.debug(`Total message length: ${totalMessageContent.split(" ").length}, words`);
+    logger$1.debug(`Total message length: ${totalMessageContent.split(" ").length}, words`);
     let lastChunk = void 0;
     const dataStream = createDataStream({
       async execute(dataStream2) {
@@ -4602,7 +4552,7 @@ async function chatAction({ context, request }) {
           messageSliceId = messages.length - 3;
         }
         if (filePaths.length > 0 && contextOptimization) {
-          logger.debug("Generating Chat Summary");
+          logger$1.debug("Generating Chat Summary");
           dataStream2.writeData({
             type: "progress",
             label: "summary",
@@ -4620,7 +4570,7 @@ async function chatAction({ context, request }) {
             contextOptimization,
             onFinish(resp) {
               if (resp.usage) {
-                logger.debug("createSummary token usage", JSON.stringify(resp.usage));
+                logger$1.debug("createSummary token usage", JSON.stringify(resp.usage));
                 cumulativeUsage.completionTokens += resp.usage.completionTokens || 0;
                 cumulativeUsage.promptTokens += resp.usage.promptTokens || 0;
                 cumulativeUsage.totalTokens += resp.usage.totalTokens || 0;
@@ -4639,7 +4589,7 @@ async function chatAction({ context, request }) {
             summary,
             chatId: messages.slice(-1)?.[0]?.id
           });
-          logger.debug("Updating Context Buffer");
+          logger$1.debug("Updating Context Buffer");
           dataStream2.writeData({
             type: "progress",
             label: "context",
@@ -4659,7 +4609,7 @@ async function chatAction({ context, request }) {
             summary,
             onFinish(resp) {
               if (resp.usage) {
-                logger.debug("selectContext token usage", JSON.stringify(resp.usage));
+                logger$1.debug("selectContext token usage", JSON.stringify(resp.usage));
                 cumulativeUsage.completionTokens += resp.usage.completionTokens || 0;
                 cumulativeUsage.promptTokens += resp.usage.promptTokens || 0;
                 cumulativeUsage.totalTokens += resp.usage.totalTokens || 0;
@@ -4667,7 +4617,7 @@ async function chatAction({ context, request }) {
             }
           });
           if (filteredFiles) {
-            logger.debug(`files in context : ${JSON.stringify(Object.keys(filteredFiles))}`);
+            logger$1.debug(`files in context : ${JSON.stringify(Object.keys(filteredFiles))}`);
           }
           dataStream2.writeMessageAnnotation({
             type: "codeContext",
@@ -4690,7 +4640,7 @@ async function chatAction({ context, request }) {
         const options = {
           toolChoice: "none",
           onFinish: async ({ text: content, finishReason, usage }) => {
-            logger.debug("usage", JSON.stringify(usage));
+            logger$1.debug("usage", JSON.stringify(usage));
             if (usage) {
               cumulativeUsage.completionTokens += usage.completionTokens || 0;
               cumulativeUsage.promptTokens += usage.promptTokens || 0;
@@ -4719,7 +4669,7 @@ async function chatAction({ context, request }) {
               throw Error("Cannot continue message: Maximum segments reached");
             }
             const switchesLeft = MAX_RESPONSE_SEGMENTS - stream.switches;
-            logger.info(`Reached max token limit (${MAX_TOKENS}): Continuing message (${switchesLeft} switches left)`);
+            logger$1.info(`Reached max token limit (${MAX_TOKENS}): Continuing message (${switchesLeft} switches left)`);
             const lastUserMessage = messages.filter((x) => x.role == "user").slice(-1)[0];
             const { model, provider } = extractPropertiesFromMessage(lastUserMessage);
             messages.push({ id: generateId$1(), role: "assistant", content });
@@ -4750,7 +4700,7 @@ ${CONTINUE_PROMPT}`
               for await (const part of result2.fullStream) {
                 if (part.type === "error") {
                   const error = part.error;
-                  logger.error(`${error}`);
+                  logger$1.error(`${error}`);
                   return;
                 }
               }
@@ -4782,7 +4732,7 @@ ${CONTINUE_PROMPT}`
           for await (const part of result.fullStream) {
             if (part.type === "error") {
               const error = part.error;
-              logger.error(`${error}`);
+              logger$1.error(`${error}`);
               return;
             }
           }
@@ -4831,7 +4781,7 @@ ${CONTINUE_PROMPT}`
       }
     });
   } catch (error) {
-    logger.error(error);
+    logger$1.error(error);
     if (error.message?.includes("API key")) {
       throw new Response("Invalid or missing API key", {
         status: 401,
@@ -4845,10 +4795,279 @@ ${CONTINUE_PROMPT}`
   }
 }
 
-const route13 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route19 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
-  action
+  action: action$2
 }, Symbol.toStringTag, { value: 'Module' }));
+
+const MESSAGE_LIMITS = {
+  free: 10,
+  starter: 100,
+  pro: 300,
+  default: 10
+  // Default limit for unknown plans
+};
+function useMessageLimit(isAuthenticated, user) {
+  const [messageCount, setMessageCount] = useState(0);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showSubscriptionPlans, setShowSubscriptionPlans] = useState(false);
+  const [monthlyLimit, setMonthlyLimit] = useState(0);
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "admin") {
+        setMonthlyLimit(Infinity);
+        return;
+      }
+      const plan = user.plan?.toLowerCase() || "free";
+      setMonthlyLimit(
+        plan in MESSAGE_LIMITS ? MESSAGE_LIMITS[plan] : MESSAGE_LIMITS.default
+      );
+    } else {
+      setMonthlyLimit(1);
+    }
+  }, [isAuthenticated, user]);
+  useEffect(() => {
+    const currentMonth = (/* @__PURE__ */ new Date()).getMonth() + "-" + (/* @__PURE__ */ new Date()).getFullYear();
+    const storedMonthKey = localStorage.getItem("messageCountMonth");
+    if (storedMonthKey !== currentMonth) {
+      localStorage.setItem("messageCountMonth", currentMonth);
+      localStorage.setItem("messageCount", "0");
+      setMessageCount(0);
+      return;
+    }
+    const storedCount = localStorage.getItem("messageCount");
+    if (storedCount) {
+      setMessageCount(parseInt(storedCount, 10));
+    }
+  }, [isAuthenticated]);
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowLoginPrompt(false);
+    }
+  }, [isAuthenticated]);
+  const incrementMessageCount = () => {
+    if (isAuthenticated && user?.role === "admin") {
+      return true;
+    }
+    const newCount = messageCount + 1;
+    if (!isAuthenticated && newCount > 1) {
+      setShowLoginPrompt(true);
+      return false;
+    }
+    if (isAuthenticated && newCount > monthlyLimit) {
+      setShowSubscriptionPlans(true);
+      return false;
+    }
+    setMessageCount(newCount);
+    const currentMonth = (/* @__PURE__ */ new Date()).getMonth() + "-" + (/* @__PURE__ */ new Date()).getFullYear();
+    localStorage.setItem("messageCountMonth", currentMonth);
+    localStorage.setItem("messageCount", newCount.toString());
+    return true;
+  };
+  const resetMessageCount = () => {
+    setMessageCount(0);
+    localStorage.setItem("messageCount", "0");
+  };
+  const closeLoginPrompt = () => {
+    setShowLoginPrompt(false);
+  };
+  const closeSubscriptionPlans = () => {
+    setShowSubscriptionPlans(false);
+  };
+  return {
+    messageCount,
+    monthlyLimit,
+    showLoginPrompt,
+    showSubscriptionPlans,
+    incrementMessageCount,
+    resetMessageCount,
+    closeLoginPrompt,
+    closeSubscriptionPlans,
+    canSendMessage: isAuthenticated ? user?.role === "admin" || messageCount < monthlyLimit : messageCount < 1
+  };
+}
+
+const EXPORT_LIMITS = {
+  free: 0,
+  // Free users cannot export
+  starter: 4,
+  // Starter users can export up to 4 conversations
+  pro: 20,
+  // Pro users can export up to 20 conversations
+  admin: Infinity,
+  // Admin users have unlimited exports
+  default: 0
+  // Default limit for unknown plans
+};
+function useExportLimit(isAuthenticated, user) {
+  const [exportCount, setExportCount] = useState(0);
+  const [showSubscriptionPlans, setShowSubscriptionPlans] = useState(false);
+  const [monthlyLimit, setMonthlyLimit] = useState(0);
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "admin") {
+        setMonthlyLimit(Infinity);
+        return;
+      }
+      const plan = user.plan?.toLowerCase() || "free";
+      setMonthlyLimit(
+        plan in EXPORT_LIMITS ? EXPORT_LIMITS[plan] : EXPORT_LIMITS.default
+      );
+    } else {
+      setMonthlyLimit(0);
+    }
+  }, [isAuthenticated, user]);
+  useEffect(() => {
+    const currentMonth = (/* @__PURE__ */ new Date()).getMonth() + "-" + (/* @__PURE__ */ new Date()).getFullYear();
+    const storedMonthKey = localStorage.getItem("exportCountMonth");
+    if (storedMonthKey !== currentMonth) {
+      localStorage.setItem("exportCountMonth", currentMonth);
+      localStorage.setItem("exportCount", "0");
+      setExportCount(0);
+      return;
+    }
+    const storedCount = localStorage.getItem("exportCount");
+    if (storedCount) {
+      setExportCount(parseInt(storedCount, 10));
+    }
+  }, [isAuthenticated]);
+  const incrementExportCount = () => {
+    if (isAuthenticated && user?.role === "admin") {
+      return true;
+    }
+    if (isAuthenticated && user?.plan?.toLowerCase() === "free") {
+      setShowSubscriptionPlans(true);
+      return false;
+    }
+    const newCount = exportCount + 1;
+    if (isAuthenticated && newCount > monthlyLimit) {
+      setShowSubscriptionPlans(true);
+      return false;
+    }
+    setExportCount(newCount);
+    const currentMonth = (/* @__PURE__ */ new Date()).getMonth() + "-" + (/* @__PURE__ */ new Date()).getFullYear();
+    localStorage.setItem("exportCountMonth", currentMonth);
+    localStorage.setItem("exportCount", newCount.toString());
+    return true;
+  };
+  const resetExportCount = () => {
+    setExportCount(0);
+    localStorage.setItem("exportCount", "0");
+  };
+  const closeSubscriptionPlans = () => {
+    setShowSubscriptionPlans(false);
+  };
+  return {
+    exportCount,
+    monthlyLimit,
+    showSubscriptionPlans,
+    incrementExportCount,
+    resetExportCount,
+    closeSubscriptionPlans,
+    canExport: isAuthenticated ? user?.role === "admin" || user?.plan?.toLowerCase() !== "free" && exportCount < monthlyLimit : false
+  };
+}
+
+const SubscriptionPlansPopup = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return /* @__PURE__ */ jsx("div", { className: "fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4", children: /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] rounded-lg p-8 w-full max-w-5xl relative overflow-auto max-h-[90vh]", children: [
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: onClose,
+        className: "absolute top-4 right-4 text-gray-400 hover:text-gray-300 bg-transparent border-0 outline-none p-0",
+        children: /* @__PURE__ */ jsx("div", { className: "i-ph:x text-xl" })
+      }
+    ),
+    /* @__PURE__ */ jsxs("div", { className: "text-center mb-8", children: [
+      /* @__PURE__ */ jsx("h2", { className: "text-3xl font-bold text-white mb-4", children: "Acabou as mensagens?" }),
+      /* @__PURE__ */ jsx("p", { className: "text-xl text-gray-300", children: "Volte mês que vem ou assine um dos nossos planos para ter mais mensagens!" })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0a0a0c] rounded-lg p-6 flex flex-col h-full", children: [
+        /* @__PURE__ */ jsx("h3", { className: "text-2xl font-bold text-white mb-2", children: "Starter" }),
+        /* @__PURE__ */ jsx("p", { className: "text-gray-400 mb-6", children: "Ideal para uso pessoal" }),
+        /* @__PURE__ */ jsxs("div", { className: "text-4xl font-bold text-white mb-6", children: [
+          "R$149,99",
+          /* @__PURE__ */ jsx("span", { className: "text-lg font-normal text-gray-400", children: "/mês" })
+        ] }),
+        /* @__PURE__ */ jsx(
+          "a",
+          {
+            href: "https://buy.stripe.com/8wMdSa5kfaH83GU6ou",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "block w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-3 rounded-md mb-8 font-medium text-center",
+            children: "Assinar Agora"
+          }
+        ),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-4 mt-auto", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "100 mensagens por mês" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "4 exportações de chat" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Acesso a todos os modelos" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Suporte por email" })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0a0a0c] rounded-lg p-6 flex flex-col h-full relative overflow-hidden", children: [
+        /* @__PURE__ */ jsx("div", { className: "absolute top-0 right-0", children: /* @__PURE__ */ jsx("div", { className: "bg-blue-600 text-white px-4 py-1 font-medium", children: "Popular" }) }),
+        /* @__PURE__ */ jsx("h3", { className: "text-2xl font-bold text-white mb-2", children: "Pro" }),
+        /* @__PURE__ */ jsx("p", { className: "text-gray-400 mb-6", children: "Para profissionais e equipes" }),
+        /* @__PURE__ */ jsxs("div", { className: "text-4xl font-bold text-white mb-6", children: [
+          "R$349,99",
+          /* @__PURE__ */ jsx("span", { className: "text-lg font-normal text-gray-400", children: "/mês" })
+        ] }),
+        /* @__PURE__ */ jsx(
+          "a",
+          {
+            href: "https://buy.stripe.com/3cs6pIh2XbLcfpCbIP",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "block w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md mb-8 font-medium text-center",
+            children: "Assinar Agora"
+          }
+        ),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-4 mt-auto", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "300 mensagens por mês" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "20 exportações de chat" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Acesso prioritário a novos recursos" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Acesso a todos os modelos" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Suporte prioritário" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-blue-500 mr-3 mt-1", children: /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-lg" }) }),
+            /* @__PURE__ */ jsx("span", { className: "text-white", children: "Recursos avançados de personalização" })
+          ] })
+        ] })
+      ] })
+    ] })
+  ] }) });
+};
 
 const Menu = undefined;
 
@@ -4945,128 +5164,6 @@ const Messages = undefined;
 
 const SendButton = undefined;
 
-const providerEnvKeyStatusCache = {};
-const apiKeyMemoizeCache = {};
-function getApiKeysFromCookies() {
-  const storedApiKeys = Cookies.get("apiKeys");
-  let parsedKeys = {};
-  if (storedApiKeys) {
-    parsedKeys = apiKeyMemoizeCache[storedApiKeys];
-    if (!parsedKeys) {
-      parsedKeys = apiKeyMemoizeCache[storedApiKeys] = JSON.parse(storedApiKeys);
-    }
-  }
-  return parsedKeys;
-}
-const APIKeyManager = ({ provider, apiKey, setApiKey }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempKey, setTempKey] = useState(apiKey);
-  const [isEnvKeySet, setIsEnvKeySet] = useState(false);
-  useEffect(() => {
-    const savedKeys = getApiKeysFromCookies();
-    const savedKey = savedKeys[provider.name] || "";
-    setTempKey(savedKey);
-    setApiKey(savedKey);
-    setIsEditing(false);
-  }, [provider.name]);
-  const checkEnvApiKey = useCallback(async () => {
-    if (providerEnvKeyStatusCache[provider.name] !== void 0) {
-      setIsEnvKeySet(providerEnvKeyStatusCache[provider.name]);
-      return;
-    }
-    try {
-      const response = await fetch(`/api/check-env-key?provider=${encodeURIComponent(provider.name)}`);
-      const data = await response.json();
-      const isSet = data.isSet;
-      providerEnvKeyStatusCache[provider.name] = isSet;
-      setIsEnvKeySet(isSet);
-    } catch (error) {
-      console.error("Failed to check environment API key:", error);
-      setIsEnvKeySet(false);
-    }
-  }, [provider.name]);
-  useEffect(() => {
-    checkEnvApiKey();
-  }, [checkEnvApiKey]);
-  const handleSave = () => {
-    setApiKey(tempKey);
-    const currentKeys = getApiKeysFromCookies();
-    const newKeys = { ...currentKeys, [provider.name]: tempKey };
-    Cookies.set("apiKeys", JSON.stringify(newKeys));
-    setIsEditing(false);
-  };
-  return /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between py-3 px-1", children: [
-    /* @__PURE__ */ jsx("div", { className: "flex items-center gap-2 flex-1", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
-      /* @__PURE__ */ jsxs("span", { className: "text-sm font-medium text-bolt-elements-textSecondary", children: [
-        provider?.name,
-        " API Key:"
-      ] }),
-      !isEditing && /* @__PURE__ */ jsx("div", { className: "flex items-center gap-2", children: apiKey ? /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-green-500 w-4 h-4" }),
-        /* @__PURE__ */ jsx("span", { className: "text-xs text-green-500", children: "Set via UI" })
-      ] }) : isEnvKeySet ? /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx("div", { className: "i-ph:check-circle-fill text-green-500 w-4 h-4" }),
-        /* @__PURE__ */ jsx("span", { className: "text-xs text-green-500", children: "Set via environment variable" })
-      ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx("div", { className: "i-ph:x-circle-fill text-red-500 w-4 h-4" }),
-        /* @__PURE__ */ jsx("span", { className: "text-xs text-red-500", children: "Not Set (Please set via UI or ENV_VAR)" })
-      ] }) })
-    ] }) }),
-    /* @__PURE__ */ jsx("div", { className: "flex items-center gap-2 shrink-0", children: isEditing ? /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx(
-        "input",
-        {
-          type: "password",
-          value: tempKey,
-          placeholder: "Enter API Key",
-          onChange: (e) => setTempKey(e.target.value),
-          className: "w-[300px] px-3 py-1.5 text-sm rounded border border-bolt-elements-borderColor \n                        bg-bolt-elements-prompt-background text-bolt-elements-textPrimary \n                        focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus"
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        IconButton,
-        {
-          onClick: handleSave,
-          title: "Save API Key",
-          className: "bg-green-500/10 hover:bg-green-500/20 text-green-500",
-          children: /* @__PURE__ */ jsx("div", { className: "i-ph:check w-4 h-4" })
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        IconButton,
-        {
-          onClick: () => setIsEditing(false),
-          title: "Cancel",
-          className: "bg-red-500/10 hover:bg-red-500/20 text-red-500",
-          children: /* @__PURE__ */ jsx("div", { className: "i-ph:x w-4 h-4" })
-        }
-      )
-    ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx(
-        IconButton,
-        {
-          onClick: () => setIsEditing(true),
-          title: "Edit API Key",
-          className: "bg-blue-500/10 hover:bg-blue-500/20 text-blue-500",
-          children: /* @__PURE__ */ jsx("div", { className: "i-ph:pencil-simple w-4 h-4" })
-        }
-      ),
-      provider?.getApiKeyLink && !apiKey && /* @__PURE__ */ jsxs(
-        IconButton,
-        {
-          onClick: () => window.open(provider?.getApiKeyLink),
-          title: "Get API Key",
-          className: "bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 flex items-center gap-2",
-          children: [
-            /* @__PURE__ */ jsx("span", { className: "text-xs whitespace-nowrap", children: provider?.labelForGetApiKey || "Get API Key" }),
-            /* @__PURE__ */ jsx("div", { className: `${provider?.icon || "i-ph:key"} w-4 h-4` })
-          ]
-        }
-      )
-    ] }) })
-  ] });
-};
-
 const BaseChat$1 = "s";
 const Chat$1 = "t";
 const PromptEffectContainer = "u";
@@ -5144,7 +5241,62 @@ const WithTooltip = forwardRef(
 );
 
 const ExportChatButton = ({ exportChat }) => {
-  return /* @__PURE__ */ jsx(WithTooltip, { tooltip: "Export Chat", children: /* @__PURE__ */ jsx(IconButton, { title: "Export Chat", onClick: () => exportChat?.(), children: /* @__PURE__ */ jsx("div", { className: "i-ph:download-simple text-xl" }) }) });
+  const [user, setUser] = useState(null);
+  const isAuthenticated = !!user;
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem("userData");
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error("Error checking authentication:", error);
+    }
+  }, []);
+  const {
+    exportCount,
+    monthlyLimit,
+    showSubscriptionPlans,
+    incrementExportCount,
+    closeSubscriptionPlans,
+    canExport
+  } = useExportLimit(isAuthenticated, user);
+  const handleExport = () => {
+    if (!canExport) {
+      incrementExportCount();
+      return;
+    }
+    const canExportNow = incrementExportCount();
+    if (!canExportNow) {
+      return;
+    }
+    exportChat?.();
+    const remaining = monthlyLimit - exportCount - 1;
+    if (remaining > 0) {
+      toast.success(`Chat exported! You have ${remaining} exports remaining this month.`);
+    } else if (remaining === 0) {
+      toast.warning(`Chat exported! This was your last export for this month.`);
+    }
+  };
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx(WithTooltip, { tooltip: canExport ? "Export Chat" : "Export limit reached", children: /* @__PURE__ */ jsx(
+      IconButton,
+      {
+        title: "Export Chat",
+        onClick: handleExport,
+        disabled: !canExport,
+        className: !canExport ? "opacity-50 cursor-not-allowed" : "",
+        children: /* @__PURE__ */ jsx("div", { className: "i-ph:download-simple text-xl" })
+      }
+    ) }),
+    /* @__PURE__ */ jsx(
+      SubscriptionPlansPopup,
+      {
+        isOpen: showSubscriptionPlans,
+        onClose: closeSubscriptionPlans
+      }
+    )
+  ] });
 };
 
 const IGNORE_PATTERNS$1 = [
@@ -5347,12 +5499,12 @@ const buttonVariants = cva(
     }
   }
 );
-const Button = React.forwardRef(
+const Button$1 = React.forwardRef(
   ({ className, variant, size, _asChild = false, ...props }, ref) => {
     return /* @__PURE__ */ jsx("button", { className: classNames(buttonVariants({ variant, size }), className), ref, ...props });
   }
 );
-Button.displayName = "Button";
+Button$1.displayName = "Button";
 
 const ImportFolderButton = ({ className, importChat }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -5439,7 +5591,7 @@ const ImportFolderButton = ({ className, importChat }) => {
       }
     ),
     /* @__PURE__ */ jsxs(
-      Button,
+      Button$1,
       {
         onClick: () => {
           const input = document.getElementById("folder-import");
@@ -5513,7 +5665,7 @@ function ImportButtons(importChat) {
     ),
     /* @__PURE__ */ jsx("div", { className: "flex flex-col items-center gap-4 max-w-2xl text-center", children: /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
       /* @__PURE__ */ jsxs(
-        Button,
+        Button$1,
         {
           onClick: () => {
             const input = document.getElementById("chat-import");
@@ -5871,6 +6023,39 @@ function getLocalStorage(key) {
   }
 }
 
+const logger = createScopedLogger("ChatHistory");
+async function openDatabase() {
+  if (typeof indexedDB === "undefined") {
+    console.error("indexedDB is not available in this environment.");
+    return void 0;
+  }
+  return new Promise((resolve) => {
+    const request = indexedDB.open("boltHistory", 1);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains("chats")) {
+        const store = db.createObjectStore("chats", { keyPath: "id" });
+        store.createIndex("id", "id", { unique: true });
+        store.createIndex("urlId", "urlId", { unique: true });
+      }
+    };
+    request.onsuccess = (event) => {
+      resolve(event.target.result);
+    };
+    request.onerror = (event) => {
+      resolve(void 0);
+      logger.error(event.target.error);
+    };
+  });
+}
+
+const { saveAs } = fileSaver;
+
+await openDatabase() ;
+const chatId = atom(void 0);
+atom(void 0);
+atom(void 0);
+
 function formatSize(bytes) {
   const units = ["B", "KB", "MB", "GB", "TB"];
   let size = bytes;
@@ -5899,8 +6084,8 @@ const Input = forwardRef(({ className, type, ...props }, ref) => {
 Input.displayName = "Input";
 
 function StatsDialog({ isOpen, onClose, onConfirm, stats, isLargeRepo }) {
-  return /* @__PURE__ */ jsx(Dialog.Root, { open: isOpen, onOpenChange: (open) => !open && onClose(), children: /* @__PURE__ */ jsxs(Dialog.Portal, { children: [
-    /* @__PURE__ */ jsx(Dialog.Overlay, { className: "fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" }),
+  return /* @__PURE__ */ jsx(Dialog$1.Root, { open: isOpen, onOpenChange: (open) => !open && onClose(), children: /* @__PURE__ */ jsxs(Dialog$1.Portal, { children: [
+    /* @__PURE__ */ jsx(Dialog$1.Overlay, { className: "fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" }),
     /* @__PURE__ */ jsx("div", { className: "fixed inset-0 flex items-center justify-center z-[9999]", children: /* @__PURE__ */ jsx(
       motion.div,
       {
@@ -5909,7 +6094,7 @@ function StatsDialog({ isOpen, onClose, onConfirm, stats, isLargeRepo }) {
         exit: { opacity: 0, scale: 0.95 },
         transition: { duration: 0.2 },
         className: "w-[90vw] md:w-[500px]",
-        children: /* @__PURE__ */ jsxs(Dialog.Content, { className: "bg-white dark:bg-[#1E1E1E] rounded-lg border border-[#E5E5E5] dark:border-[#333333] shadow-xl", children: [
+        children: /* @__PURE__ */ jsxs(Dialog$1.Content, { className: "bg-white dark:bg-[#1E1E1E] rounded-lg border border-[#E5E5E5] dark:border-[#333333] shadow-xl", children: [
           /* @__PURE__ */ jsx("div", { className: "p-6 space-y-4", children: /* @__PURE__ */ jsxs("div", { children: [
             /* @__PURE__ */ jsx("h3", { className: "text-lg font-medium text-[#111111] dark:text-white", children: "Repository Overview" }),
             /* @__PURE__ */ jsxs("div", { className: "mt-4 space-y-2", children: [
@@ -6210,7 +6395,7 @@ function RepositorySelectionDialog({ isOpen, onClose, onSelect }) {
     onClose();
   };
   return /* @__PURE__ */ jsxs(
-    Dialog.Root,
+    Dialog$1.Root,
     {
       open: isOpen,
       onOpenChange: (open) => {
@@ -6219,13 +6404,13 @@ function RepositorySelectionDialog({ isOpen, onClose, onSelect }) {
         }
       },
       children: [
-        /* @__PURE__ */ jsxs(Dialog.Portal, { children: [
-          /* @__PURE__ */ jsx(Dialog.Overlay, { className: "fixed inset-0 bg-black/50 backdrop-blur-sm z-50" }),
-          /* @__PURE__ */ jsxs(Dialog.Content, { className: "fixed top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[90vw] md:w-[600px] max-h-[85vh] overflow-hidden bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl z-[51] border border-[#E5E5E5] dark:border-[#333333]", children: [
+        /* @__PURE__ */ jsxs(Dialog$1.Portal, { children: [
+          /* @__PURE__ */ jsx(Dialog$1.Overlay, { className: "fixed inset-0 bg-black/50 backdrop-blur-sm z-50" }),
+          /* @__PURE__ */ jsxs(Dialog$1.Content, { className: "fixed top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[90vw] md:w-[600px] max-h-[85vh] overflow-hidden bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl z-[51] border border-[#E5E5E5] dark:border-[#333333]", children: [
             /* @__PURE__ */ jsxs("div", { className: "p-4 border-b border-[#E5E5E5] dark:border-[#333333] flex items-center justify-between", children: [
-              /* @__PURE__ */ jsx(Dialog.Title, { className: "text-lg font-semibold text-bolt-elements-textPrimary dark:text-bolt-elements-textPrimary-dark", children: "Import GitHub Repository" }),
+              /* @__PURE__ */ jsx(Dialog$1.Title, { className: "text-lg font-semibold text-bolt-elements-textPrimary dark:text-bolt-elements-textPrimary-dark", children: "Import GitHub Repository" }),
               /* @__PURE__ */ jsxs(
-                Dialog.Close,
+                Dialog$1.Close,
                 {
                   onClick: handleClose,
                   className: classNames(
@@ -6583,7 +6768,7 @@ ${escapeBoltTags(file.content)}
   };
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs(
-      Button,
+      Button$1,
       {
         onClick: () => setIsDialogOpen(true),
         title: "Clone a Git Repo",
@@ -6627,246 +6812,6 @@ const FilePreview = ({ files, imageDataList, onRemove }) => {
   ] }) }, file.name + file.size)) });
 };
 
-const ModelSelector = ({
-  model,
-  setModel,
-  provider,
-  setProvider,
-  modelList,
-  providerList,
-  modelLoading
-}) => {
-  const [modelSearchQuery, setModelSearchQuery] = useState("");
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState(-1);
-  const searchInputRef = useRef(null);
-  const optionsRef = useRef([]);
-  const dropdownRef = useRef(null);
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsModelDropdownOpen(false);
-        setModelSearchQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-  const filteredModels = [...modelList].filter((e) => e.provider === provider?.name && e.name).filter(
-    (model2) => model2.label.toLowerCase().includes(modelSearchQuery.toLowerCase()) || model2.name.toLowerCase().includes(modelSearchQuery.toLowerCase())
-  );
-  useEffect(() => {
-    setFocusedIndex(-1);
-  }, [modelSearchQuery, isModelDropdownOpen]);
-  useEffect(() => {
-    if (isModelDropdownOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [isModelDropdownOpen]);
-  const handleKeyDown = (e) => {
-    if (!isModelDropdownOpen) {
-      return;
-    }
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setFocusedIndex((prev) => {
-          const next = prev + 1;
-          if (next >= filteredModels.length) {
-            return 0;
-          }
-          return next;
-        });
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setFocusedIndex((prev) => {
-          const next = prev - 1;
-          if (next < 0) {
-            return filteredModels.length - 1;
-          }
-          return next;
-        });
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < filteredModels.length) {
-          const selectedModel = filteredModels[focusedIndex];
-          setModel?.(selectedModel.name);
-          setIsModelDropdownOpen(false);
-          setModelSearchQuery("");
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        setIsModelDropdownOpen(false);
-        setModelSearchQuery("");
-        break;
-      case "Tab":
-        if (!e.shiftKey && focusedIndex === filteredModels.length - 1) {
-          setIsModelDropdownOpen(false);
-        }
-        break;
-    }
-  };
-  useEffect(() => {
-    if (focusedIndex >= 0 && optionsRef.current[focusedIndex]) {
-      optionsRef.current[focusedIndex]?.scrollIntoView({ block: "nearest" });
-    }
-  }, [focusedIndex]);
-  useEffect(() => {
-    if (providerList.length === 0) {
-      return;
-    }
-    if (provider && !providerList.map((p) => p.name).includes(provider.name)) {
-      const firstEnabledProvider = providerList[0];
-      setProvider?.(firstEnabledProvider);
-      const firstModel = modelList.find((m) => m.provider === firstEnabledProvider.name);
-      if (firstModel) {
-        setModel?.(firstModel.name);
-      }
-    }
-  }, [providerList, provider, setProvider, modelList, setModel]);
-  if (providerList.length === 0) {
-    return /* @__PURE__ */ jsx("div", { className: "mb-2 p-4 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary", children: /* @__PURE__ */ jsx("p", { className: "text-center", children: "No providers are currently enabled. Please enable at least one provider in the settings to start using the chat." }) });
-  }
-  return /* @__PURE__ */ jsxs("div", { className: "mb-2 flex gap-2 flex-col sm:flex-row", children: [
-    /* @__PURE__ */ jsx(
-      "select",
-      {
-        value: provider?.name ?? "",
-        onChange: (e) => {
-          const newProvider = providerList.find((p) => p.name === e.target.value);
-          if (newProvider && setProvider) {
-            setProvider(newProvider);
-          }
-          const firstModel = [...modelList].find((m) => m.provider === e.target.value);
-          if (firstModel && setModel) {
-            setModel(firstModel.name);
-          }
-        },
-        className: "flex-1 p-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-prompt-background text-bolt-elements-textPrimary focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus transition-all",
-        children: providerList.map((provider2) => /* @__PURE__ */ jsx("option", { value: provider2.name, children: provider2.name }, provider2.name))
-      }
-    ),
-    /* @__PURE__ */ jsxs("div", { className: "relative flex-1 lg:max-w-[70%]", onKeyDown: handleKeyDown, ref: dropdownRef, children: [
-      /* @__PURE__ */ jsx(
-        "div",
-        {
-          className: classNames(
-            "w-full p-2 rounded-lg border border-bolt-elements-borderColor",
-            "bg-bolt-elements-prompt-background text-bolt-elements-textPrimary",
-            "focus-within:outline-none focus-within:ring-2 focus-within:ring-bolt-elements-focus",
-            "transition-all cursor-pointer",
-            isModelDropdownOpen ? "ring-2 ring-bolt-elements-focus" : void 0
-          ),
-          onClick: () => setIsModelDropdownOpen(!isModelDropdownOpen),
-          onKeyDown: (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setIsModelDropdownOpen(!isModelDropdownOpen);
-            }
-          },
-          role: "combobox",
-          "aria-expanded": isModelDropdownOpen,
-          "aria-controls": "model-listbox",
-          "aria-haspopup": "listbox",
-          tabIndex: 0,
-          children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
-            /* @__PURE__ */ jsx("div", { className: "truncate", children: modelList.find((m) => m.name === model)?.label || "Select model" }),
-            /* @__PURE__ */ jsx(
-              "div",
-              {
-                className: classNames(
-                  "i-ph:caret-down w-4 h-4 text-bolt-elements-textSecondary opacity-75",
-                  isModelDropdownOpen ? "rotate-180" : void 0
-                )
-              }
-            )
-          ] })
-        }
-      ),
-      isModelDropdownOpen && /* @__PURE__ */ jsxs(
-        "div",
-        {
-          className: "absolute z-10 w-full mt-1 py-1 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2  shadow-lg",
-          role: "listbox",
-          id: "model-listbox",
-          children: [
-            /* @__PURE__ */ jsx("div", { className: "px-2 pb-2", children: /* @__PURE__ */ jsxs("div", { className: "relative", children: [
-              /* @__PURE__ */ jsx(
-                "input",
-                {
-                  ref: searchInputRef,
-                  type: "text",
-                  value: modelSearchQuery,
-                  onChange: (e) => setModelSearchQuery(e.target.value),
-                  placeholder: "Search models...",
-                  className: classNames(
-                    "w-full pl-8 pr-3 py-1.5 rounded-md text-sm",
-                    "bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor",
-                    "text-bolt-elements-textPrimary placeholder:text-bolt-elements-textTertiary",
-                    "focus:outline-none focus:ring-2 focus:ring-bolt-elements-focus",
-                    "transition-all"
-                  ),
-                  onClick: (e) => e.stopPropagation(),
-                  role: "searchbox",
-                  "aria-label": "Search models"
-                }
-              ),
-              /* @__PURE__ */ jsx("div", { className: "absolute left-2.5 top-1/2 -translate-y-1/2", children: /* @__PURE__ */ jsx("span", { className: "i-ph:magnifying-glass text-bolt-elements-textTertiary" }) })
-            ] }) }),
-            /* @__PURE__ */ jsx(
-              "div",
-              {
-                className: classNames(
-                  "max-h-60 overflow-y-auto",
-                  "sm:scrollbar-none",
-                  "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2",
-                  "[&::-webkit-scrollbar-thumb]:bg-bolt-elements-borderColor",
-                  "[&::-webkit-scrollbar-thumb]:hover:bg-bolt-elements-borderColorHover",
-                  "[&::-webkit-scrollbar-thumb]:rounded-full",
-                  "[&::-webkit-scrollbar-track]:bg-bolt-elements-background-depth-2",
-                  "[&::-webkit-scrollbar-track]:rounded-full",
-                  "sm:[&::-webkit-scrollbar]:w-1.5 sm:[&::-webkit-scrollbar]:h-1.5",
-                  "sm:hover:[&::-webkit-scrollbar-thumb]:bg-bolt-elements-borderColor/50",
-                  "sm:hover:[&::-webkit-scrollbar-thumb:hover]:bg-bolt-elements-borderColor",
-                  "sm:[&::-webkit-scrollbar-track]:bg-transparent"
-                ),
-                children: modelLoading === "all" || modelLoading === provider?.name ? /* @__PURE__ */ jsx("div", { className: "px-3 py-2 text-sm text-bolt-elements-textTertiary", children: "Loading..." }) : filteredModels.length === 0 ? /* @__PURE__ */ jsx("div", { className: "px-3 py-2 text-sm text-bolt-elements-textTertiary", children: "No models found" }) : filteredModels.map((modelOption, index) => /* @__PURE__ */ jsx(
-                  "div",
-                  {
-                    ref: (el) => optionsRef.current[index] = el,
-                    role: "option",
-                    "aria-selected": model === modelOption.name,
-                    className: classNames(
-                      "px-3 py-2 text-sm cursor-pointer",
-                      "hover:bg-bolt-elements-background-depth-3",
-                      "text-bolt-elements-textPrimary",
-                      "outline-none",
-                      model === modelOption.name || focusedIndex === index ? "bg-bolt-elements-background-depth-2" : void 0,
-                      focusedIndex === index ? "ring-1 ring-inset ring-bolt-elements-focus" : void 0
-                    ),
-                    onClick: (e) => {
-                      e.stopPropagation();
-                      setModel?.(modelOption.name);
-                      setIsModelDropdownOpen(false);
-                      setModelSearchQuery("");
-                    },
-                    tabIndex: focusedIndex === index ? 0 : -1,
-                    children: modelOption.label
-                  },
-                  index
-                ))
-              }
-            )
-          ]
-        }
-      )
-    ] })
-  ] });
-};
-
 const SpeechRecognitionButton = ({
   isListening,
   onStart,
@@ -6886,6 +6831,690 @@ const SpeechRecognitionButton = ({
     }
   );
 };
+
+const savedConnection = typeof localStorage !== "undefined" ? localStorage.getItem("supabase_connection") : null;
+const savedCredentials = typeof localStorage !== "undefined" ? localStorage.getItem("supabaseCredentials") : null;
+const initialState = savedConnection ? JSON.parse(savedConnection) : {
+  user: null,
+  token: "",
+  stats: void 0,
+  selectedProjectId: void 0,
+  isConnected: false,
+  project: void 0
+};
+if (savedCredentials && !initialState.credentials) {
+  try {
+    initialState.credentials = JSON.parse(savedCredentials);
+  } catch (e) {
+    console.error("Failed to parse saved credentials:", e);
+  }
+}
+const supabaseConnection = atom(initialState);
+if (initialState.token && !initialState.stats) {
+  fetchSupabaseStats(initialState.token).catch(console.error);
+}
+const isConnecting = atom(false);
+const isFetchingStats = atom(false);
+const isFetchingApiKeys = atom(false);
+function updateSupabaseConnection(connection) {
+  const currentState = supabaseConnection.get();
+  if (connection.user !== void 0 || connection.token !== void 0) {
+    const newUser = connection.user !== void 0 ? connection.user : currentState.user;
+    const newToken = connection.token !== void 0 ? connection.token : currentState.token;
+    connection.isConnected = !!(newUser && newToken);
+  }
+  if (connection.selectedProjectId !== void 0) {
+    if (connection.selectedProjectId && currentState.stats?.projects) {
+      const selectedProject = currentState.stats.projects.find(
+        (project) => project.id === connection.selectedProjectId
+      );
+      if (selectedProject) {
+        connection.project = selectedProject;
+      } else {
+        connection.project = {
+          id: connection.selectedProjectId,
+          name: `Project ${connection.selectedProjectId.substring(0, 8)}...`,
+          region: "unknown",
+          organization_id: "",
+          status: "active",
+          created_at: (/* @__PURE__ */ new Date()).toISOString()
+        };
+      }
+    } else if (connection.selectedProjectId === "") {
+      connection.project = void 0;
+      connection.credentials = void 0;
+    }
+  }
+  const newState = { ...currentState, ...connection };
+  supabaseConnection.set(newState);
+  if (connection.user || connection.token || connection.selectedProjectId !== void 0 || connection.credentials) {
+    localStorage.setItem("supabase_connection", JSON.stringify(newState));
+    if (newState.credentials) {
+      localStorage.setItem("supabaseCredentials", JSON.stringify(newState.credentials));
+    } else {
+      localStorage.removeItem("supabaseCredentials");
+    }
+  } else {
+    localStorage.removeItem("supabase_connection");
+    localStorage.removeItem("supabaseCredentials");
+  }
+}
+async function fetchSupabaseStats(token) {
+  isFetchingStats.set(true);
+  try {
+    const response = await fetch("/api/supabase", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        token
+      })
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch projects");
+    }
+    const data = await response.json();
+    updateSupabaseConnection({
+      user: data.user,
+      stats: data.stats
+    });
+  } catch (error) {
+    console.error("Failed to fetch Supabase stats:", error);
+    throw error;
+  } finally {
+    isFetchingStats.set(false);
+  }
+}
+async function fetchProjectApiKeys(projectId, token) {
+  isFetchingApiKeys.set(true);
+  try {
+    const response = await fetch("/api/supabase/variables", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        projectId,
+        token
+      })
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch API keys");
+    }
+    const data = await response.json();
+    const apiKeys = data.apiKeys;
+    const anonKey = apiKeys.find((key) => key.name === "anon" || key.name === "public");
+    if (anonKey) {
+      const supabaseUrl = `https://${projectId}.supabase.co`;
+      updateSupabaseConnection({
+        credentials: {
+          anonKey: anonKey.api_key,
+          supabaseUrl
+        }
+      });
+      return { anonKey: anonKey.api_key, supabaseUrl };
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch project API keys:", error);
+    throw error;
+  } finally {
+    isFetchingApiKeys.set(false);
+  }
+}
+
+function useSupabaseConnection() {
+  const connection = useStore(supabaseConnection);
+  const connecting = useStore(isConnecting);
+  const fetchingStats = useStore(isFetchingStats);
+  const fetchingApiKeys = useStore(isFetchingApiKeys);
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  useEffect(() => {
+    const savedConnection = localStorage.getItem("supabase_connection");
+    const savedCredentials = localStorage.getItem("supabaseCredentials");
+    if (savedConnection) {
+      const parsed = JSON.parse(savedConnection);
+      if (savedCredentials && !parsed.credentials) {
+        parsed.credentials = JSON.parse(savedCredentials);
+      }
+      updateSupabaseConnection(parsed);
+      if (parsed.token && parsed.selectedProjectId && !parsed.credentials) {
+        fetchProjectApiKeys(parsed.selectedProjectId, parsed.token).catch(console.error);
+      }
+    }
+  }, []);
+  const handleConnect = async () => {
+    isConnecting.set(true);
+    try {
+      const cleanToken = connection.token.trim();
+      const response = await fetch("/api/supabase", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          token: cleanToken
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to connect");
+      }
+      updateSupabaseConnection({
+        user: data.user,
+        token: connection.token,
+        stats: data.stats
+      });
+      toast.success("Successfully connected to Supabase");
+      setIsProjectsExpanded(true);
+      return true;
+    } catch (error) {
+      console.error("Connection error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to connect to Supabase");
+      updateSupabaseConnection({ user: null, token: "" });
+      return false;
+    } finally {
+      isConnecting.set(false);
+    }
+  };
+  const handleDisconnect = () => {
+    updateSupabaseConnection({ user: null, token: "" });
+    toast.success("Disconnected from Supabase");
+    setIsDropdownOpen(false);
+  };
+  const selectProject = async (projectId) => {
+    const currentState = supabaseConnection.get();
+    let projectData = void 0;
+    if (projectId && currentState.stats?.projects) {
+      projectData = currentState.stats.projects.find((project) => project.id === projectId);
+    }
+    updateSupabaseConnection({
+      selectedProjectId: projectId,
+      project: projectData
+    });
+    if (projectId && currentState.token) {
+      try {
+        await fetchProjectApiKeys(projectId, currentState.token);
+        toast.success("Project selected successfully");
+      } catch (error) {
+        console.error("Failed to fetch API keys:", error);
+        toast.error("Selected project but failed to fetch API keys");
+      }
+    } else {
+      toast.success("Project selected successfully");
+    }
+    setIsDropdownOpen(false);
+  };
+  const handleCreateProject = async () => {
+    window.open("https://app.supabase.com/new/new-project", "_blank");
+  };
+  return {
+    connection,
+    connecting,
+    fetchingStats,
+    fetchingApiKeys,
+    isProjectsExpanded,
+    setIsProjectsExpanded,
+    isDropdownOpen,
+    setIsDropdownOpen,
+    handleConnect,
+    handleDisconnect,
+    selectProject,
+    handleCreateProject,
+    updateToken: (token) => updateSupabaseConnection({ ...connection, token }),
+    isConnected: !!(connection.user && connection.token),
+    fetchProjectApiKeys: (projectId) => {
+      if (connection.token) {
+        return fetchProjectApiKeys(projectId, connection.token);
+      }
+      return Promise.reject(new Error("No token available"));
+    }
+  };
+}
+
+const cubicEasingFn = cubicBezier(0.4, 0, 0.2, 1);
+
+const DialogButton = memo(({ type, children, onClick, disabled }) => {
+  return /* @__PURE__ */ jsx(
+    "button",
+    {
+      className: classNames("inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors", {
+        "bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600": type === "primary",
+        // Ajustado de purple-500 para blue-500 e purple-600 para blue-600
+        "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100": type === "secondary",
+        "bg-transparent text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10": type === "danger"
+      }),
+      onClick,
+      disabled,
+      children
+    }
+  );
+});
+const DialogTitle = memo(({ className, children, ...props }) => {
+  return /* @__PURE__ */ jsx(
+    Dialog$1.Title,
+    {
+      className: classNames("text-lg font-medium text-bolt-elements-textPrimary", "flex items-center gap-2", className),
+      ...props,
+      children
+    }
+  );
+});
+memo(({ className, children, ...props }) => {
+  return /* @__PURE__ */ jsx(
+    Dialog$1.Description,
+    {
+      className: classNames("text-sm text-bolt-elements-textSecondary", "mt-1", className),
+      ...props,
+      children
+    }
+  );
+});
+const transition = {
+  duration: 0.15,
+  ease: cubicEasingFn
+};
+const dialogBackdropVariants = {
+  closed: {
+    opacity: 0,
+    transition
+  },
+  open: {
+    opacity: 1,
+    transition
+  }
+};
+const dialogVariants = {
+  closed: {
+    x: "-50%",
+    y: "-40%",
+    scale: 0.96,
+    opacity: 0,
+    transition
+  },
+  open: {
+    x: "-50%",
+    y: "-50%",
+    scale: 1,
+    opacity: 1,
+    transition
+  }
+};
+const Dialog = memo(({ children, className, showCloseButton = true, onClose, onBackdrop }) => {
+  return /* @__PURE__ */ jsxs(Dialog$1.Portal, { children: [
+    /* @__PURE__ */ jsx(Dialog$1.Overlay, { asChild: true, children: /* @__PURE__ */ jsx(
+      motion.div,
+      {
+        className: classNames(
+          "fixed inset-0 z-[9999]",
+          "bg-[#FAFAFA]/80 dark:bg-[#0A0A0A]/80",
+          "backdrop-blur-[2px]"
+        ),
+        initial: "closed",
+        animate: "open",
+        exit: "closed",
+        variants: dialogBackdropVariants,
+        onClick: onBackdrop
+      }
+    ) }),
+    /* @__PURE__ */ jsx(Dialog$1.Content, { asChild: true, children: /* @__PURE__ */ jsx(
+      motion.div,
+      {
+        className: classNames(
+          "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+          "bg-[#FAFAFA] dark:bg-[#0A0A0A]",
+          "rounded-lg shadow-lg",
+          "border border-[#E5E5E5] dark:border-[#1A1A1A]",
+          "z-[9999] w-[520px]",
+          className
+        ),
+        initial: "closed",
+        animate: "open",
+        exit: "closed",
+        variants: dialogVariants,
+        children: /* @__PURE__ */ jsxs("div", { className: "flex flex-col", children: [
+          children,
+          showCloseButton && /* @__PURE__ */ jsx(Dialog$1.Close, { asChild: true, onClick: onClose, children: /* @__PURE__ */ jsx(
+            IconButton,
+            {
+              icon: "i-ph:x",
+              className: "absolute top-3 right-3 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary"
+            }
+          ) })
+        ] })
+      }
+    ) })
+  ] });
+});
+
+function SupabaseConnection() {
+  const {
+    connection: supabaseConn,
+    connecting,
+    fetchingStats,
+    isProjectsExpanded,
+    setIsProjectsExpanded,
+    isDropdownOpen: isDialogOpen,
+    setIsDropdownOpen: setIsDialogOpen,
+    handleConnect,
+    handleDisconnect,
+    selectProject,
+    handleCreateProject,
+    updateToken,
+    isConnected,
+    fetchProjectApiKeys
+  } = useSupabaseConnection();
+  const currentChatId = useStore(chatId);
+  useEffect(() => {
+    const handleOpenConnectionDialog = () => {
+      setIsDialogOpen(true);
+    };
+    document.addEventListener("open-supabase-connection", handleOpenConnectionDialog);
+    return () => {
+      document.removeEventListener("open-supabase-connection", handleOpenConnectionDialog);
+    };
+  }, [setIsDialogOpen]);
+  useEffect(() => {
+    if (isConnected && currentChatId) {
+      const savedProjectId = localStorage.getItem(`supabase-project-${currentChatId}`);
+      if (!savedProjectId && supabaseConn.selectedProjectId) {
+        localStorage.setItem(`supabase-project-${currentChatId}`, supabaseConn.selectedProjectId);
+      } else if (savedProjectId && savedProjectId !== supabaseConn.selectedProjectId) {
+        selectProject(savedProjectId);
+      }
+    }
+  }, [isConnected, currentChatId]);
+  useEffect(() => {
+    if (currentChatId && supabaseConn.selectedProjectId) {
+      localStorage.setItem(`supabase-project-${currentChatId}`, supabaseConn.selectedProjectId);
+    } else if (currentChatId && !supabaseConn.selectedProjectId) {
+      localStorage.removeItem(`supabase-project-${currentChatId}`);
+    }
+  }, [currentChatId, supabaseConn.selectedProjectId]);
+  useEffect(() => {
+    if (isConnected && supabaseConn.token) {
+      fetchSupabaseStats(supabaseConn.token).catch(console.error);
+    }
+  }, [isConnected, supabaseConn.token]);
+  useEffect(() => {
+    if (isConnected && supabaseConn.selectedProjectId && supabaseConn.token && !supabaseConn.credentials) {
+      fetchProjectApiKeys(supabaseConn.selectedProjectId).catch(console.error);
+    }
+  }, [isConnected, supabaseConn.selectedProjectId, supabaseConn.token, supabaseConn.credentials]);
+  return /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+    /* @__PURE__ */ jsx("div", { className: "flex border border-bolt-elements-borderColor rounded-md overflow-hidden mr-2 text-sm", children: /* @__PURE__ */ jsxs(
+      Button,
+      {
+        active: true,
+        disabled: connecting,
+        onClick: () => setIsDialogOpen(!isDialogOpen),
+        className: "hover:bg-bolt-elements-item-backgroundActive !text-white flex items-center gap-2",
+        children: [
+          /* @__PURE__ */ jsx(
+            "img",
+            {
+              className: "w-4 h-4",
+              height: "20",
+              width: "20",
+              crossOrigin: "anonymous",
+              src: "https://cdn.simpleicons.org/supabase"
+            }
+          ),
+          isConnected && supabaseConn.project && /* @__PURE__ */ jsx("span", { className: "ml-1 text-xs max-w-[100px] truncate", children: supabaseConn.project.name })
+        ]
+      }
+    ) }),
+    /* @__PURE__ */ jsx(Root, { open: isDialogOpen, onOpenChange: setIsDialogOpen, children: isDialogOpen && /* @__PURE__ */ jsx(Dialog, { className: "max-w-[520px] p-6", children: !isConnected ? /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxs(DialogTitle, { children: [
+        /* @__PURE__ */ jsx(
+          "img",
+          {
+            className: "w-5 h-5",
+            height: "24",
+            width: "24",
+            crossOrigin: "anonymous",
+            src: "https://cdn.simpleicons.org/supabase"
+          }
+        ),
+        "Connect to Supabase"
+      ] }),
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("label", { className: "block text-sm text-bolt-elements-textSecondary mb-2", children: "Access Token" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "password",
+            value: supabaseConn.token,
+            onChange: (e) => updateToken(e.target.value),
+            disabled: connecting,
+            placeholder: "Enter your Supabase access token",
+            className: classNames(
+              "w-full px-3 py-2 rounded-lg text-sm",
+              "bg-[#F8F8F8] dark:bg-[#1A1A1A]",
+              "border border-[#E5E5E5] dark:border-[#333333]",
+              "text-bolt-elements-textPrimary placeholder-bolt-elements-textTertiary",
+              "focus:outline-none focus:ring-1 focus:ring-[#3ECF8E]",
+              "disabled:opacity-50"
+            )
+          }
+        ),
+        /* @__PURE__ */ jsx("div", { className: "mt-2 text-sm text-bolt-elements-textSecondary", children: /* @__PURE__ */ jsxs(
+          "a",
+          {
+            href: "https://app.supabase.com/account/tokens",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "text-[#3ECF8E] hover:underline inline-flex items-center gap-1",
+            children: [
+              "Get your token",
+              /* @__PURE__ */ jsx("div", { className: "i-ph:arrow-square-out w-4 h-4" })
+            ]
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-2 mt-6", children: [
+        /* @__PURE__ */ jsx(Close, { asChild: true, children: /* @__PURE__ */ jsx(DialogButton, { type: "secondary", children: "Cancel" }) }),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: handleConnect,
+            disabled: connecting || !supabaseConn.token,
+            className: classNames(
+              "px-4 py-2 rounded-lg text-sm flex items-center gap-2",
+              "bg-[#3ECF8E] text-white",
+              "hover:bg-[#3BBF84]",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            ),
+            children: connecting ? /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx("div", { className: "i-ph:spinner-gap animate-spin" }),
+              "Connecting..."
+            ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx("div", { className: "i-ph:plug-charging w-4 h-4" }),
+              "Connect"
+            ] })
+          }
+        )
+      ] })
+    ] }) : /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+      /* @__PURE__ */ jsx("div", { className: "flex items-center justify-between mb-2", children: /* @__PURE__ */ jsxs(DialogTitle, { children: [
+        /* @__PURE__ */ jsx(
+          "img",
+          {
+            className: "w-5 h-5",
+            height: "24",
+            width: "24",
+            crossOrigin: "anonymous",
+            src: "https://cdn.simpleicons.org/supabase"
+          }
+        ),
+        "Supabase Connection"
+      ] }) }),
+      /* @__PURE__ */ jsx("div", { className: "flex items-center gap-4 p-3 bg-[#F8F8F8] dark:bg-[#1A1A1A] rounded-lg", children: /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium text-bolt-elements-textPrimary", children: supabaseConn.user?.email }),
+        /* @__PURE__ */ jsxs("p", { className: "text-xs text-bolt-elements-textSecondary", children: [
+          "Role: ",
+          supabaseConn.user?.role
+        ] })
+      ] }) }),
+      fetchingStats ? /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-bolt-elements-textSecondary", children: [
+        /* @__PURE__ */ jsx("div", { className: "i-ph:spinner-gap w-4 h-4 animate-spin" }),
+        "Fetching projects..."
+      ] }) : /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-2", children: [
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => setIsProjectsExpanded(!isProjectsExpanded),
+              className: "bg-transparent text-left text-sm font-medium text-bolt-elements-textPrimary flex items-center gap-2",
+              children: [
+                /* @__PURE__ */ jsx("div", { className: "i-ph:database w-4 h-4" }),
+                "Your Projects (",
+                supabaseConn.stats?.totalProjects || 0,
+                ")",
+                /* @__PURE__ */ jsx(
+                  "div",
+                  {
+                    className: classNames(
+                      "i-ph:caret-down w-4 h-4 transition-transform",
+                      isProjectsExpanded ? "rotate-180" : ""
+                    )
+                  }
+                )
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxs(
+              "button",
+              {
+                onClick: () => fetchSupabaseStats(supabaseConn.token),
+                className: "px-2 py-1 rounded-md text-xs bg-[#F0F0F0] dark:bg-[#252525] text-bolt-elements-textSecondary hover:bg-[#E5E5E5] dark:hover:bg-[#333333] flex items-center gap-1",
+                title: "Refresh projects list",
+                children: [
+                  /* @__PURE__ */ jsx("div", { className: "i-ph:arrows-clockwise w-3 h-3" }),
+                  "Refresh"
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxs(
+              "button",
+              {
+                onClick: () => handleCreateProject(),
+                className: "px-2 py-1 rounded-md text-xs bg-[#3ECF8E] text-white hover:bg-[#3BBF84] flex items-center gap-1",
+                children: [
+                  /* @__PURE__ */ jsx("div", { className: "i-ph:plus w-3 h-3" }),
+                  "New Project"
+                ]
+              }
+            )
+          ] })
+        ] }),
+        isProjectsExpanded && /* @__PURE__ */ jsxs(Fragment, { children: [
+          !supabaseConn.selectedProjectId && /* @__PURE__ */ jsx("div", { className: "mb-2 p-3 bg-[#F8F8F8] dark:bg-[#1A1A1A] rounded-lg text-sm text-bolt-elements-textSecondary", children: "Select a project or create a new one for this chat" }),
+          supabaseConn.stats?.projects?.length ? /* @__PURE__ */ jsx("div", { className: "grid gap-2 max-h-60 overflow-y-auto", children: supabaseConn.stats.projects.map((project) => /* @__PURE__ */ jsx(
+            "div",
+            {
+              className: "block p-3 rounded-lg border border-[#E5E5E5] dark:border-[#1A1A1A] hover:border-[#3ECF8E] dark:hover:border-[#3ECF8E] transition-colors",
+              children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+                /* @__PURE__ */ jsxs("div", { children: [
+                  /* @__PURE__ */ jsxs("h5", { className: "text-sm font-medium text-bolt-elements-textPrimary flex items-center gap-1", children: [
+                    /* @__PURE__ */ jsx("div", { className: "i-ph:database w-3 h-3 text-[#3ECF8E]" }),
+                    project.name
+                  ] }),
+                  /* @__PURE__ */ jsx("div", { className: "text-xs text-bolt-elements-textSecondary mt-1", children: project.region })
+                ] }),
+                /* @__PURE__ */ jsx(
+                  "button",
+                  {
+                    onClick: () => selectProject(project.id),
+                    className: classNames(
+                      "px-3 py-1 rounded-md text-xs",
+                      supabaseConn.selectedProjectId === project.id ? "bg-[#3ECF8E] text-white" : "bg-[#F0F0F0] dark:bg-[#252525] text-bolt-elements-textSecondary hover:bg-[#3ECF8E] hover:text-white"
+                    ),
+                    children: supabaseConn.selectedProjectId === project.id ? /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-1", children: [
+                      /* @__PURE__ */ jsx("div", { className: "i-ph:check w-3 h-3" }),
+                      "Selected"
+                    ] }) : "Select"
+                  }
+                )
+              ] })
+            },
+            project.id
+          )) }) : /* @__PURE__ */ jsxs("div", { className: "text-sm text-bolt-elements-textSecondary flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx("div", { className: "i-ph:info w-4 h-4" }),
+            "No projects found"
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-2 mt-6", children: [
+        /* @__PURE__ */ jsx(Close, { asChild: true, children: /* @__PURE__ */ jsx(DialogButton, { type: "secondary", children: "Close" }) }),
+        /* @__PURE__ */ jsxs(DialogButton, { type: "danger", onClick: handleDisconnect, children: [
+          /* @__PURE__ */ jsx("div", { className: "i-ph:plug-x w-4 h-4" }),
+          "Disconnect"
+        ] })
+      ] })
+    ] }) }) })
+  ] });
+}
+function Button({ active = false, disabled = false, children, onClick, className }) {
+  return /* @__PURE__ */ jsx(
+    "button",
+    {
+      className: classNames(
+        "flex items-center p-1.5",
+        {
+          "bg-bolt-elements-item-backgroundDefault hover:bg-bolt-elements-item-backgroundActive text-bolt-elements-textTertiary hover:text-bolt-elements-textPrimary": !active,
+          "bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentAccent": active && !disabled,
+          "bg-bolt-elements-item-backgroundDefault text-alpha-gray-20 dark:text-alpha-white-20 cursor-not-allowed": disabled
+        },
+        className
+      ),
+      onClick,
+      children
+    }
+  );
+}
+
+function SupabaseAlert() {
+  const connection = useStore(supabaseConnection);
+  const [showAlert, setShowAlert] = useState(false);
+  useEffect(() => {
+    setShowAlert(!!connection.selectedProjectId && !connection.credentials);
+  }, [connection.selectedProjectId, connection.credentials]);
+  if (!showAlert) {
+    return null;
+  }
+  const handleOpenConnectionDialog = () => {
+    const event = new CustomEvent("open-supabase-connection");
+    document.dispatchEvent(event);
+  };
+  return /* @__PURE__ */ jsxs(
+    "div",
+    {
+      className: classNames(
+        "flex items-center gap-3 p-3 mb-4 rounded-lg border",
+        "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"
+      ),
+      children: [
+        /* @__PURE__ */ jsx("div", { className: "i-ph:warning-circle text-amber-500 dark:text-amber-400 w-5 h-5 flex-shrink-0" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex-1", children: [
+          /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium text-amber-800 dark:text-amber-300", children: "Supabase Connection Issue" }),
+          /* @__PURE__ */ jsx("p", { className: "text-xs text-amber-700 dark:text-amber-400 mt-1", children: "Your Supabase project is selected, but API credentials are missing. Please reconnect to fetch the API keys." })
+        ] }),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: handleOpenConnectionDialog,
+            className: "px-3 py-1.5 text-xs font-medium rounded-md bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors",
+            children: "Reconnect"
+          }
+        )
+      ]
+    }
+  );
+}
 
 const ScreenshotStateManager = ({
   setUploadedFiles,
@@ -6943,7 +7572,7 @@ function ChatAlert({ alert, clearAlert, postMessage }) {
   const { description, content, source } = alert;
   const isPreview = source === "preview";
   const title = isPreview ? "Preview Error" : "Terminal Error";
-  const message = isPreview ? "We encountered an error while running the preview. Would you like Bolt to analyze and help resolve this issue?" : "We encountered an error while running terminal commands. Would you like Bolt to analyze and help resolve this issue?";
+  const message = isPreview ? "We encountered an error while running the preview. Would you like Ada to analyze and help resolve this issue?" : "We encountered an error while running terminal commands. Would you like Ada to analyze and help resolve this issue?";
   return /* @__PURE__ */ jsx(AnimatePresence, { children: /* @__PURE__ */ jsx(
     motion.div,
     {
@@ -7044,8 +7673,6 @@ ${content}
     }
   ) });
 }
-
-const cubicEasingFn = cubicBezier(0.4, 0, 0.2, 1);
 
 function ProgressCompilation({ data }) {
   const [progressList, setProgressList] = React__default.useState([]);
@@ -7312,6 +7939,44 @@ create((set) => ({
   }
 }));
 
+const storedProfile = typeof window !== "undefined" ? localStorage.getItem("bolt_profile") : null;
+const initialProfile = storedProfile ? JSON.parse(storedProfile) : {
+  username: "",
+  bio: "",
+  avatar: ""
+};
+const profileStore = atom(initialProfile);
+const updateProfile = (updates) => {
+  profileStore.set({ ...profileStore.get(), ...updates });
+  if (typeof window !== "undefined") {
+    localStorage.setItem("bolt_profile", JSON.stringify(profileStore.get()));
+  }
+};
+
+function initializeProfileFromAuth() {
+  if (typeof window !== "undefined") {
+    try {
+      const userData = localStorage.getItem("userData");
+      if (userData) {
+        const user = JSON.parse(userData);
+        updateProfile({
+          username: user.name || "",
+          bio: user.email || "",
+          avatar: ""
+          // No avatar in our auth system yet
+        });
+      }
+    } catch (error) {
+      console.error("Error initializing profile from auth:", error);
+    }
+  }
+}
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    initializeProfileFromAuth();
+  }, 0);
+}
+
 const TEXTAREA_MIN_HEIGHT = 76;
 const BaseChat = React__default.forwardRef(
   ({
@@ -7347,7 +8012,10 @@ const BaseChat = React__default.forwardRef(
     actionRunner
   }, ref) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
-    const [apiKeys, setApiKeys] = useState(getApiKeysFromCookies());
+    const FIXED_API_KEYS = {
+      Anthropic: "api_here"
+    };
+    const [apiKeys, setApiKeys] = useState(FIXED_API_KEYS);
     const [modelList, setModelList] = useState([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
     const [isListening, setIsListening] = useState(false);
@@ -7393,15 +8061,18 @@ const BaseChat = React__default.forwardRef(
       }
     }, []);
     useEffect(() => {
+      const anthropicProvider = providerList?.find((p) => p.name === "Anthropic");
+      if (anthropicProvider && setProvider) {
+        setProvider(anthropicProvider);
+      }
+      if (setModel) {
+        setModel("claude-3-7-sonnet-20250219");
+      }
+    }, [providerList, setProvider, setModel]);
+    useEffect(() => {
+      setApiKeys(FIXED_API_KEYS);
       if (typeof window !== "undefined") {
-        let parsedApiKeys = {};
-        try {
-          parsedApiKeys = getApiKeysFromCookies();
-          setApiKeys(parsedApiKeys);
-        } catch (error) {
-          console.error("Error loading API keys from cookies:", error);
-          Cookies.remove("apiKeys");
-        }
+        Cookies.set("apiKeys", JSON.stringify(FIXED_API_KEYS), { path: "/" });
         setIsModelLoading("all");
         fetch("/api/models").then((response) => response.json()).then((data2) => {
           const typedData = data2;
@@ -7413,25 +8084,6 @@ const BaseChat = React__default.forwardRef(
         });
       }
     }, [providerList, provider]);
-    const onApiKeysChange = async (providerName, apiKey) => {
-      const newApiKeys = { ...apiKeys, [providerName]: apiKey };
-      setApiKeys(newApiKeys);
-      Cookies.set("apiKeys", JSON.stringify(newApiKeys));
-      setIsModelLoading(providerName);
-      let providerModels = [];
-      try {
-        const response = await fetch(`/api/models/${encodeURIComponent(providerName)}`);
-        const data2 = await response.json();
-        providerModels = data2.modelList;
-      } catch (error) {
-        console.error("Error loading dynamic models for:", providerName, error);
-      }
-      setModelList((prevModels) => {
-        const otherModels = prevModels.filter((model2) => model2.provider !== providerName);
-        return [...otherModels, ...providerModels];
-      });
-      setIsModelLoading(void 0);
-    };
     const startListening = () => {
       if (recognition) {
         recognition.start();
@@ -7444,7 +8096,42 @@ const BaseChat = React__default.forwardRef(
         setIsListening(false);
       }
     };
+    const [user, setUser] = useState(null);
+    const isAuthenticated = !!user;
+    useEffect(() => {
+      try {
+        const userData = localStorage.getItem("userData");
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+      }
+    }, []);
+    const {
+      monthlyLimit: messageMonthlyLimit,
+      showLoginPrompt,
+      showSubscriptionPlans: showMessageSubscriptionPlans,
+      incrementMessageCount,
+      resetMessageCount,
+      closeLoginPrompt,
+      closeSubscriptionPlans: closeMessageSubscriptionPlans,
+      canSendMessage
+    } = useMessageLimit(isAuthenticated, user);
+    useExportLimit(isAuthenticated, user);
+    const showSubscriptionPlans = showMessageSubscriptionPlans;
+    const closeSubscriptionPlans = () => {
+      closeMessageSubscriptionPlans();
+    };
     const handleSendMessage = (event, messageInput) => {
+      if (!canSendMessage) {
+        incrementMessageCount();
+        return;
+      }
+      const canSend = incrementMessageCount();
+      if (!canSend) {
+        return;
+      }
       if (sendMessage) {
         sendMessage(event, messageInput);
         if (recognition) {
@@ -7508,6 +8195,53 @@ const BaseChat = React__default.forwardRef(
         "data-chat-visible": showChat,
         children: [
           /* @__PURE__ */ jsx(ClientOnly, { children: () => /* @__PURE__ */ jsx(Menu, {}) }),
+          /* @__PURE__ */ jsx(
+            SubscriptionPlansPopup,
+            {
+              isOpen: showSubscriptionPlans,
+              onClose: closeSubscriptionPlans
+            }
+          ),
+          showLoginPrompt && /* @__PURE__ */ jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50", children: /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] rounded-lg p-8 w-full max-w-md relative border border-gray-800", children: [
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: closeLoginPrompt,
+                className: "absolute top-2 right-2 text-gray-400 hover:text-white",
+                children: /* @__PURE__ */ jsx("div", { className: "i-ph:x text-xl" })
+              }
+            ),
+            /* @__PURE__ */ jsx("h2", { className: "text-2xl font-bold text-white mb-4", children: "Message Limit Reached" }),
+            /* @__PURE__ */ jsx("p", { className: "text-gray-300 mb-6", children: isAuthenticated ? `You've reached the limit of ${messageMonthlyLimit} messages for your current plan (${user?.plan || "Free"}).
+                  Upgrade your plan to send more messages this month.` : `You've reached the limit of messages for non-registered users. 
+                  Sign in or create an account to continue using Ada without limitations.` }),
+            /* @__PURE__ */ jsxs("div", { className: "flex flex-col space-y-3", children: [
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  onClick: () => window.location.href = "/login",
+                  className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white py-2 rounded-md",
+                  children: "Sign In"
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  onClick: () => window.location.href = "/register",
+                  className: "w-full bg-transparent hover:bg-gray-800 text-white border border-gray-700 py-2 rounded-md",
+                  children: "Create Account"
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  onClick: closeLoginPrompt,
+                  className: "w-full bg-transparent text-gray-400 hover:text-white py-2",
+                  children: "Continue with Limited Access"
+                }
+              )
+            ] })
+          ] }) }),
           /* @__PURE__ */ jsxs("div", { ref: scrollRef, className: "flex flex-col lg:flex-row overflow-y-auto w-full h-full", children: [
             /* @__PURE__ */ jsxs("div", { className: classNames(styles$1.Chat, "flex flex-col flex-grow lg:min-w-[var(--chat-min-width)] h-full"), children: [
               !chatStarted && /* @__PURE__ */ jsxs("div", { id: "intro", className: "mt-[16vh] max-w-chat mx-auto text-center px-4 lg:px-0", children: [
@@ -7540,17 +8274,20 @@ const BaseChat = React__default.forwardRef(
                           "sticky bottom-2": chatStarted
                         }),
                         children: [
-                          /* @__PURE__ */ jsx("div", { className: "bg-bolt-elements-background-depth-2", children: actionAlert && /* @__PURE__ */ jsx(
-                            ChatAlert,
-                            {
-                              alert: actionAlert,
-                              clearAlert: () => clearAlert?.(),
-                              postMessage: (message) => {
-                                sendMessage?.({}, message);
-                                clearAlert?.();
+                          /* @__PURE__ */ jsxs("div", { className: "bg-bolt-elements-background-depth-2", children: [
+                            actionAlert && /* @__PURE__ */ jsx(
+                              ChatAlert,
+                              {
+                                alert: actionAlert,
+                                clearAlert: () => clearAlert?.(),
+                                postMessage: (message) => {
+                                  sendMessage?.({}, message);
+                                  clearAlert?.();
+                                }
                               }
-                            }
-                          ) }),
+                            ),
+                            /* @__PURE__ */ jsx(SupabaseAlert, {})
+                          ] }),
                           progressAnnotations && /* @__PURE__ */ jsx(ProgressCompilation, { data: progressAnnotations }),
                           /* @__PURE__ */ jsxs(
                             "div",
@@ -7597,32 +8334,6 @@ const BaseChat = React__default.forwardRef(
                                   /* @__PURE__ */ jsx("rect", { className: classNames(styles$1.PromptEffectLine), pathLength: "100", strokeLinecap: "round" }),
                                   /* @__PURE__ */ jsx("rect", { className: classNames(styles$1.PromptShine), x: "48", y: "24", width: "70", height: "1" })
                                 ] }),
-                                /* @__PURE__ */ jsx("div", { children: /* @__PURE__ */ jsx(ClientOnly, { children: () => /* @__PURE__ */ jsxs("div", { className: isModelSettingsCollapsed ? "hidden" : "", children: [
-                                  /* @__PURE__ */ jsx(
-                                    ModelSelector,
-                                    {
-                                      model,
-                                      setModel,
-                                      modelList,
-                                      provider,
-                                      setProvider,
-                                      providerList: providerList || PROVIDER_LIST,
-                                      apiKeys,
-                                      modelLoading: isModelLoading
-                                    },
-                                    provider?.name + ":" + modelList.length
-                                  ),
-                                  (providerList || []).length > 0 && provider && (!LOCAL_PROVIDERS.includes(provider.name) || "OpenAILike") && /* @__PURE__ */ jsx(
-                                    APIKeyManager,
-                                    {
-                                      provider,
-                                      apiKey: apiKeys[provider.name] || "",
-                                      setApiKey: (key) => {
-                                        onApiKeysChange(provider.name, key);
-                                      }
-                                    }
-                                  )
-                                ] }) }) }),
                                 /* @__PURE__ */ jsx(
                                   FilePreview,
                                   {
@@ -7758,23 +8469,20 @@ const BaseChat = React__default.forwardRef(
                                               disabled: isStreaming
                                             }
                                           ),
-                                          chatStarted && /* @__PURE__ */ jsx(ClientOnly, { children: () => /* @__PURE__ */ jsx(ExportChatButton, { exportChat }) }),
-                                          /* @__PURE__ */ jsxs(
-                                            IconButton,
-                                            {
-                                              title: "Model Settings",
-                                              className: classNames("transition-all flex items-center gap-1", {
-                                                "bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent": isModelSettingsCollapsed,
-                                                "bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault": !isModelSettingsCollapsed
-                                              }),
-                                              onClick: () => setIsModelSettingsCollapsed(!isModelSettingsCollapsed),
-                                              disabled: !providerList || providerList.length === 0,
-                                              children: [
-                                                /* @__PURE__ */ jsx("div", { className: `i-ph:caret-${isModelSettingsCollapsed ? "right" : "down"} text-lg` }),
-                                                isModelSettingsCollapsed ? /* @__PURE__ */ jsx("span", { className: "text-xs", children: model }) : /* @__PURE__ */ jsx("span", {})
-                                              ]
+                                          chatStarted && /* @__PURE__ */ jsx(ClientOnly, { children: () => {
+                                            const userData = localStorage.getItem("userData");
+                                            let userPlan = "free";
+                                            if (userData) {
+                                              try {
+                                                const parsedUserData = JSON.parse(userData);
+                                                userPlan = parsedUserData.plan?.toLowerCase() || "free";
+                                              } catch (error) {
+                                                console.error("Error parsing user data:", error);
+                                              }
                                             }
-                                          )
+                                            return userPlan !== "free" ? /* @__PURE__ */ jsx(ExportChatButton, { exportChat }) : null;
+                                          } }),
+                                          /* @__PURE__ */ jsx(SupabaseConnection, {})
                                         ] }),
                                         input.length > 3 ? /* @__PURE__ */ jsxs("div", { className: "text-xs text-bolt-elements-textTertiary", children: [
                                           "Use ",
@@ -7821,7 +8529,35 @@ const BaseChat = React__default.forwardRef(
                 isStreaming
               }
             ) })
-          ] })
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "fixed bottom-6 right-6 z-50", children: isAuthenticated ? /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => {
+                localStorage.removeItem("userData");
+                setUser(null);
+                resetMessageCount();
+                localStorage.removeItem("messageCount");
+                localStorage.removeItem("bolt_profile");
+                window.location.href = "/";
+              },
+              className: "bg-[#1a2b4c] hover:bg-[#1f3461] text-white px-4 py-2 rounded-md flex items-center gap-2 shadow-lg",
+              children: [
+                /* @__PURE__ */ jsx("div", { className: "i-ph:arrow-right text-sm" }),
+                /* @__PURE__ */ jsx("span", { children: "Logout" })
+              ]
+            }
+          ) : /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => window.location.href = "/login",
+              className: "bg-[#1a2b4c] hover:bg-[#1f3461] text-white px-4 py-2 rounded-md flex items-center gap-2 shadow-lg",
+              children: [
+                /* @__PURE__ */ jsx("div", { className: "i-ph:sign-in text-sm" }),
+                /* @__PURE__ */ jsx("span", { children: "Login" })
+              ]
+            }
+          ) })
         ]
       }
     );
@@ -7904,7 +8640,7 @@ const BackgroundRays = () => {
 };
 
 const meta$1 = () => {
-  return [{ title: "Ada" }, { name: "description", content: "Talk with Bolt, an AI assistant from StackBlitz" }];
+  return [{ title: "Ada" }, { name: "description", content: "Talk with Ada, an AI assistant from StackBlitz" }];
 };
 const loader$2 = () => json({});
 function Index$1() {
@@ -7915,7 +8651,7 @@ function Index$1() {
   ] });
 }
 
-const route15 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route22 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: Index$1,
   loader: loader$2,
@@ -7926,16 +8662,440 @@ async function loader$1(args) {
   return json({ id: args.params.id });
 }
 
-const route14 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route20 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: Index$1,
   loader: loader$1
 }, Symbol.toStringTag, { value: 'Module' }));
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+const action$1 = async ({ request }) => {
+  const formData = await request.formData();
+  const name = formData.get("name");
+  const email = formData.get("email");
+  const password = formData.get("password");
+  if (!name || !email || !password) {
+    return json({ error: "All fields are required" });
+  }
+  if (!passwordRegex.test(password)) {
+    return json({ error: "Password does not meet complexity requirements" });
+  }
+  try {
+    const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/create/user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name, email, password })
+    });
+    const data = await response.json();
+    if (data.status) {
+      return json({ success: true, message: "Account created successfully. Please log in." });
+    } else {
+      return json({ error: data.msg });
+    }
+  } catch (error) {
+    console.error("Error registering user:", error);
+    return json({ error: "Failed to register user. Please try again." });
+  }
+};
+function RegisterPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const validatePassword = (value) => {
+    if (!passwordRegex.test(value)) {
+      setPasswordError(
+        "Password must contain at least 8 characters including uppercase, lowercase, number, and special character."
+      );
+    } else {
+      setPasswordError("");
+    }
+    setPassword(value);
+    if (confirmPassword) {
+      validateConfirmPassword(confirmPassword, value);
+    }
+  };
+  const validateConfirmPassword = (value, pass = password) => {
+    if (value !== pass) {
+      setConfirmPasswordError("Passwords do not match.");
+    } else {
+      setConfirmPasswordError("");
+    }
+    setConfirmPassword(value);
+  };
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (passwordError || confirmPasswordError) {
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/create/user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await response.json();
+      if (data.status) {
+        navigate("/login?registered=true");
+      } else {
+        setError(data.msg);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col bg-[#0a0a0c] bg-gradient-to-br from-[#0a0a0c] via-[#0d1117] to-[#131c2e] relative", children: [
+    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-[url('data:image/svg+xml;base64PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAuMDUiPjxwYXRoIGQ9Ik0yMCAyMGgyMHYyMEgyMHoiLz48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PC9nPjwvc3ZnPg==')] opacity-50" }),
+    /* @__PURE__ */ jsx("header", { className: "p-4 relative", children: /* @__PURE__ */ jsx("div", { className: "container mx-auto", children: /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxs("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "12", stroke: "white", strokeWidth: "1.5" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "3", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "9", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "23", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "9", cy: "16", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "23", cy: "16", r: "1.5", fill: "white" })
+      ] }),
+      /* @__PURE__ */ jsx("span", { className: "text-white text-xl font-semibold", children: "Ada" })
+    ] }) }) }),
+    /* @__PURE__ */ jsx("main", { className: "flex-1 flex items-center justify-center p-6 relative", children: /* @__PURE__ */ jsxs("div", { className: "w-full max-w-md space-y-8", children: [
+      /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-4xl font-bold text-white", children: "Create Account" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-gray-400", children: "Register to start using the platform" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] bg-opacity-50 backdrop-blur-sm rounded-lg p-8 shadow-2xl border border-gray-800", children: [
+        error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+        /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-6", children: [
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "name", className: "text-gray-200 block", children: "Name" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "name",
+                name: "name",
+                type: "text",
+                autoComplete: "name",
+                placeholder: "Your full name",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true,
+                value: name,
+                onChange: (e) => setName(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "text-gray-200 block", children: "Email" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "email",
+                name: "email",
+                type: "email",
+                autoComplete: "email",
+                placeholder: "your@email.com",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true,
+                value: email,
+                onChange: (e) => setEmail(e.target.value)
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "text-gray-200 block", children: "Password" }),
+            /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  id: "password",
+                  name: "password",
+                  type: showPassword ? "text" : "password",
+                  autoComplete: "new-password",
+                  placeholder: "••••••••",
+                  className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 pr-10 rounded-md",
+                  required: true,
+                  value: password,
+                  onChange: (e) => validatePassword(e.target.value)
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0",
+                  onClick: () => setShowPassword(!showPassword),
+                  children: /* @__PURE__ */ jsx("div", { className: showPassword ? "i-ph:eye-slash text-lg" : "i-ph:eye text-lg" })
+                }
+              )
+            ] }),
+            passwordError && /* @__PURE__ */ jsx("p", { className: "text-red-500 text-sm mt-1", children: passwordError })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "confirm-password", className: "text-gray-200 block", children: "Confirm Password" }),
+            /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  id: "confirm-password",
+                  name: "confirm-password",
+                  type: showConfirmPassword ? "text" : "password",
+                  autoComplete: "new-password",
+                  placeholder: "••••••••",
+                  className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 pr-10 rounded-md",
+                  required: true,
+                  value: confirmPassword,
+                  onChange: (e) => validateConfirmPassword(e.target.value)
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  className: "absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white bg-transparent border-0 outline-none p-0",
+                  onClick: () => setShowConfirmPassword(!showConfirmPassword),
+                  children: /* @__PURE__ */ jsx("div", { className: showConfirmPassword ? "i-ph:eye-slash text-lg" : "i-ph:eye text-lg" })
+                }
+              )
+            ] }),
+            confirmPasswordError && /* @__PURE__ */ jsx("p", { className: "text-red-500 text-sm mt-1", children: confirmPasswordError })
+          ] }),
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              type: "submit",
+              className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white flex items-center justify-center gap-2 py-2 rounded-md",
+              disabled: isLoading || !!passwordError || !!confirmPasswordError,
+              children: [
+                /* @__PURE__ */ jsx("div", { className: "i-ph:user-plus text-lg" }),
+                isLoading ? "Creating Account..." : "Create Account"
+              ]
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-6 text-center", children: /* @__PURE__ */ jsxs("p", { className: "text-gray-400", children: [
+          "Already have an account?",
+          " ",
+          /* @__PURE__ */ jsx(Link, { to: "/login", className: "text-gray-200 hover:text-white", children: "Sign in" })
+        ] }) })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsx("footer", { className: "py-4 relative", children: /* @__PURE__ */ jsxs("div", { className: "container mx-auto text-center text-gray-500 text-sm", children: [
+      "© ",
+      (/* @__PURE__ */ new Date()).getFullYear(),
+      " Ada. All rights reserved."
+    ] }) })
+  ] });
+}
+
+const route21 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$1,
+  default: RegisterPage
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const action = async ({ request }) => {
+  const formData = await request.formData();
+  const email = formData.get("email");
+  const password = formData.get("password");
+  if (!email || !password) {
+    return json({ error: "Email and password are required" });
+  }
+  try {
+    const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    });
+    if (!response.ok) {
+      return json({ error: "Invalid credentials" });
+    }
+    const userData = await response.json();
+    if (!userData.session_token) {
+      return json({ error: "Error to proceed to login" });
+    }
+    return json({
+      success: true,
+      user: {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        created_at: userData.created_at,
+        session_token: userData.session_token
+      }
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return json({ error: "Error to proceed to login. Please try again." });
+  }
+};
+function LoginPage() {
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  useEffect(() => {
+    const userData = localStorage.getItem("userData");
+    if (userData) {
+      navigate("/");
+    }
+  }, [navigate]);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    try {
+      const response = await fetch("https://n8n-blue.up.railway.app/webhook/ada/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.get("email"),
+          password: formData.get("password")
+        })
+      });
+      if (!response.ok) {
+        setError("Invalid credentials");
+        setIsLoading(false);
+        return;
+      }
+      const userData = await response.json();
+      if (!userData.session_token) {
+        setError("Error to proceed to login");
+        setIsLoading(false);
+        return;
+      }
+      const userDataForStorage = {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        created_at: userData.created_at,
+        session_token: userData.session_token,
+        role: userData.role || "user",
+        plan_status: userData.plan_status || "active",
+        plan: userData.plan || "free"
+      };
+      localStorage.setItem("userData", JSON.stringify(userDataForStorage));
+      updateProfile({
+        username: userDataForStorage.name || "",
+        bio: userDataForStorage.email || "",
+        avatar: ""
+      });
+      navigate("/");
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col bg-[#0a0a0c] bg-gradient-to-br from-[#0a0a0c] via-[#0d1117] to-[#131c2e] relative", children: [
+    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-[url('data:image/svg+xml;base64PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAuMDUiPjxwYXRoIGQ9Ik0yMCAyMGgyMHYyMEgyMHoiLz48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PC9nPjwvc3ZnPg==')] opacity-50" }),
+    /* @__PURE__ */ jsx("header", { className: "p-4 relative", children: /* @__PURE__ */ jsx("div", { className: "container mx-auto", children: /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxs("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "12", stroke: "white", strokeWidth: "1.5" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "16", r: "3", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "9", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "16", cy: "23", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "9", cy: "16", r: "1.5", fill: "white" }),
+        /* @__PURE__ */ jsx("circle", { cx: "23", cy: "16", r: "1.5", fill: "white" })
+      ] }),
+      /* @__PURE__ */ jsx("span", { className: "text-white text-xl font-semibold", children: "Ada" })
+    ] }) }) }),
+    /* @__PURE__ */ jsx("main", { className: "flex-1 flex items-center justify-center p-6 relative", children: /* @__PURE__ */ jsxs("div", { className: "w-full max-w-md space-y-8", children: [
+      /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-4xl font-bold text-white", children: "Login" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-gray-400", children: "Sign in to your account to access the platform" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-[#0d1117] bg-opacity-50 backdrop-blur-sm rounded-lg p-8 shadow-2xl border border-gray-800", children: [
+        error && /* @__PURE__ */ jsx("div", { className: "bg-red-500 text-white p-3 rounded-md mb-4", children: error }),
+        /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-6", children: [
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "text-gray-200 block", children: "Email" }),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "email",
+                name: "email",
+                type: "email",
+                autoComplete: "email",
+                placeholder: "your@email.com",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 rounded-md",
+                required: true
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "text-gray-200 block", children: "Password" }),
+            /* @__PURE__ */ jsx("div", { className: "relative", children: /* @__PURE__ */ jsx(
+              "input",
+              {
+                id: "password",
+                name: "password",
+                type: "password",
+                autoComplete: "current-password",
+                placeholder: "••••••••",
+                className: "w-full px-3 py-2 bg-[#0a0a0c] border border-gray-800 text-white placeholder-gray-500 focus:border-gray-700 focus:ring-gray-700 pr-10 rounded-md",
+                required: true
+              }
+            ) }),
+            /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Link, { to: "/forgot-password", className: "text-sm text-gray-400 hover:text-white", children: "Forgot your password?" }) })
+          ] }),
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              type: "submit",
+              className: "w-full bg-[#1a2b4c] hover:bg-[#1f3461] text-white flex items-center justify-center gap-2 py-2 rounded-md",
+              disabled: isLoading,
+              children: [
+                /* @__PURE__ */ jsx("div", { className: "i-ph:sign-in text-lg" }),
+                isLoading ? "Signing in..." : "Sign in"
+              ]
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-6 text-center", children: /* @__PURE__ */ jsxs("p", { className: "text-gray-400", children: [
+          "Don't have an account?",
+          " ",
+          /* @__PURE__ */ jsx(Link, { to: "/register", className: "text-gray-200 hover:text-white", children: "Register" })
+        ] }) })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsx("footer", { className: "py-4 relative", children: /* @__PURE__ */ jsxs("div", { className: "container mx-auto text-center text-gray-500 text-sm", children: [
+      "© ",
+      (/* @__PURE__ */ new Date()).getFullYear(),
+      " Ada. All rights reserved."
+    ] }) })
+  ] });
+}
+
+const route23 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action,
+  default: LoginPage
+}, Symbol.toStringTag, { value: 'Module' }));
+
 const GitUrlImport = undefined;
 
 const meta = () => {
-  return [{ title: "Bolt" }, { name: "description", content: "Talk with Bolt, an AI assistant from StackBlitz" }];
+  return [{ title: "Ada" }, { name: "description", content: "Talk with Ada, an AI assistant from StackBlitz" }];
 };
 async function loader(args) {
   return json({ url: args.params.url });
@@ -7948,14 +9108,14 @@ function Index() {
   ] });
 }
 
-const route16 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route24 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: Index,
   loader,
   meta
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','imports':['/assets/components-CloOpq9Q.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-DH2mlBPG.js','imports':['/assets/components-CloOpq9Q.js','/assets/index-C3YgEsuc.js'],'css':['/assets/root-CUkCFiB7.css']},'routes/webcontainer.preview.$id':{'id':'routes/webcontainer.preview.$id','parentId':'root','path':'webcontainer/preview/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webcontainer.preview._id-g_C1egK_.js','imports':['/assets/components-CloOpq9Q.js'],'css':[]},'routes/api.models.$provider':{'id':'routes/api.models.$provider','parentId':'routes/api.models','path':':provider','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models._provider-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.app-info':{'id':'routes/api.system.app-info','parentId':'root','path':'api/system/app-info','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.app-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.git-info':{'id':'routes/api.system.git-info','parentId':'root','path':'api/system/git-info','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.git-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.check-env-key':{'id':'routes/api.check-env-key','parentId':'root','path':'api/check-env-key','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.check-env-key-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.git-proxy.$':{'id':'routes/api.git-proxy.$','parentId':'root','path':'api/git-proxy/*','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.git-proxy._-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.enhancer':{'id':'routes/api.enhancer','parentId':'root','path':'api/enhancer','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.enhancer-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.llmcall':{'id':'routes/api.llmcall','parentId':'root','path':'api/llmcall','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.llmcall-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.deploy':{'id':'routes/api.deploy','parentId':'root','path':'api/deploy','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.deploy-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.health':{'id':'routes/api.health','parentId':'root','path':'api/health','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.health-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models':{'id':'routes/api.models','parentId':'root','path':'api/models','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.update':{'id':'routes/api.update','parentId':'root','path':'api/update','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.update-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.chat':{'id':'routes/api.chat','parentId':'root','path':'api/chat','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.chat-l0sNRNKZ.js','imports':[],'css':[]},'routes/chat.$id':{'id':'routes/chat.$id','parentId':'root','path':'chat/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/chat._id-CPADTU9q.js','imports':['/assets/_index-8qJX87WC.js','/assets/components-CloOpq9Q.js','/assets/Header-BK_oTWWV.js','/assets/index-C3YgEsuc.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-8qJX87WC.js','imports':['/assets/components-CloOpq9Q.js','/assets/Header-BK_oTWWV.js','/assets/index-C3YgEsuc.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/git':{'id':'routes/git','parentId':'root','path':'git','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/git-CuQReLsM.js','imports':['/assets/components-CloOpq9Q.js','/assets/Header-BK_oTWWV.js','/assets/index-C3YgEsuc.js'],'css':['/assets/Header-DeXKFCkm.css']}},'url':'/assets/manifest-7c5b9514.js','version':'7c5b9514'};
+const serverManifest = {'entry':{'module':'/assets/entry.client-BabmRpnX.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-DuP4VvNN.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js'],'css':['/assets/root-at6U2ugR.css']},'routes/webcontainer.preview.$id':{'id':'routes/webcontainer.preview.$id','parentId':'root','path':'webcontainer/preview/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webcontainer.preview._id-BbnY2N0U.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/reset-code-verification':{'id':'routes/reset-code-verification','parentId':'root','path':'reset-code-verification','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/reset-code-verification-CMRqDZVK.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/api.supabase.variables':{'id':'routes/api.supabase.variables','parentId':'routes/api.supabase','path':'variables','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.variables-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models.$provider':{'id':'routes/api.models.$provider','parentId':'routes/api.models','path':':provider','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models._provider-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.app-info':{'id':'routes/api.system.app-info','parentId':'root','path':'api/system/app-info','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.app-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.git-info':{'id':'routes/api.system.git-info','parentId':'root','path':'api/system/git-info','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.git-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase.query':{'id':'routes/api.supabase.query','parentId':'routes/api.supabase','path':'query','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.query-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.check-env-key':{'id':'routes/api.check-env-key','parentId':'root','path':'api/check-env-key','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.check-env-key-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.git-proxy.$':{'id':'routes/api.git-proxy.$','parentId':'root','path':'api/git-proxy/*','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.git-proxy._-l0sNRNKZ.js','imports':[],'css':[]},'routes/forgot-password':{'id':'routes/forgot-password','parentId':'root','path':'forgot-password','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/forgot-password-B-fSjVHM.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/api.enhancer':{'id':'routes/api.enhancer','parentId':'root','path':'api/enhancer','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.enhancer-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase':{'id':'routes/api.supabase','parentId':'root','path':'api/supabase','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.llmcall':{'id':'routes/api.llmcall','parentId':'root','path':'api/llmcall','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.llmcall-l0sNRNKZ.js','imports':[],'css':[]},'routes/verify-code':{'id':'routes/verify-code','parentId':'root','path':'verify-code','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/verify-code-CdHEsbVd.js','imports':['/assets/index-5yin8JJm.js'],'css':[]},'routes/api.deploy':{'id':'routes/api.deploy','parentId':'root','path':'api/deploy','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.deploy-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.health':{'id':'routes/api.health','parentId':'root','path':'api/health','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.health-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models':{'id':'routes/api.models','parentId':'root','path':'api/models','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.update':{'id':'routes/api.update','parentId':'root','path':'api/update','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.update-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.chat':{'id':'routes/api.chat','parentId':'root','path':'api/chat','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.chat-l0sNRNKZ.js','imports':[],'css':[]},'routes/chat.$id':{'id':'routes/chat.$id','parentId':'root','path':'chat/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/chat._id-B5PdbjnJ.js','imports':['/assets/_index-Cm-XOKdI.js','/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/register':{'id':'routes/register','parentId':'root','path':'register','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/register-D2itDNk2.js','imports':['/assets/index-5yin8JJm.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js','/assets/index-DgoachrA.js'],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-Cm-XOKdI.js','imports':['/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/login':{'id':'routes/login','parentId':'root','path':'login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/login-DabtSAtB.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js','/assets/profile-BYW5p1bK.js','/assets/index-DgoachrA.js'],'css':[]},'routes/git':{'id':'routes/git','parentId':'root','path':'git','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/git-DD9We-VH.js','imports':['/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']}},'url':'/assets/manifest-3ef41297.js','version':'3ef41297'};
 
 /**
        * `mode` is only relevant for the old Remix compiler but
@@ -7985,13 +9145,29 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           caseSensitive: undefined,
           module: route1
         },
+  "routes/reset-code-verification": {
+          id: "routes/reset-code-verification",
+          parentId: "root",
+          path: "reset-code-verification",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route2
+        },
+  "routes/api.supabase.variables": {
+          id: "routes/api.supabase.variables",
+          parentId: "routes/api.supabase",
+          path: "variables",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route3
+        },
   "routes/api.models.$provider": {
           id: "routes/api.models.$provider",
           parentId: "routes/api.models",
           path: ":provider",
           index: undefined,
           caseSensitive: undefined,
-          module: route2
+          module: route4
         },
   "routes/api.system.app-info": {
           id: "routes/api.system.app-info",
@@ -7999,7 +9175,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/system/app-info",
           index: undefined,
           caseSensitive: undefined,
-          module: route3
+          module: route5
         },
   "routes/api.system.git-info": {
           id: "routes/api.system.git-info",
@@ -8007,7 +9183,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/system/git-info",
           index: undefined,
           caseSensitive: undefined,
-          module: route4
+          module: route6
+        },
+  "routes/api.supabase.query": {
+          id: "routes/api.supabase.query",
+          parentId: "routes/api.supabase",
+          path: "query",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route7
         },
   "routes/api.check-env-key": {
           id: "routes/api.check-env-key",
@@ -8015,7 +9199,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/check-env-key",
           index: undefined,
           caseSensitive: undefined,
-          module: route5
+          module: route8
         },
   "routes/api.git-proxy.$": {
           id: "routes/api.git-proxy.$",
@@ -8023,7 +9207,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/git-proxy/*",
           index: undefined,
           caseSensitive: undefined,
-          module: route6
+          module: route9
+        },
+  "routes/forgot-password": {
+          id: "routes/forgot-password",
+          parentId: "root",
+          path: "forgot-password",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route10
         },
   "routes/api.enhancer": {
           id: "routes/api.enhancer",
@@ -8031,7 +9223,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/enhancer",
           index: undefined,
           caseSensitive: undefined,
-          module: route7
+          module: route11
+        },
+  "routes/api.supabase": {
+          id: "routes/api.supabase",
+          parentId: "root",
+          path: "api/supabase",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route12
         },
   "routes/api.llmcall": {
           id: "routes/api.llmcall",
@@ -8039,7 +9239,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/llmcall",
           index: undefined,
           caseSensitive: undefined,
-          module: route8
+          module: route13
+        },
+  "routes/verify-code": {
+          id: "routes/verify-code",
+          parentId: "root",
+          path: "verify-code",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route14
         },
   "routes/api.deploy": {
           id: "routes/api.deploy",
@@ -8047,7 +9255,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/deploy",
           index: undefined,
           caseSensitive: undefined,
-          module: route9
+          module: route15
         },
   "routes/api.health": {
           id: "routes/api.health",
@@ -8055,7 +9263,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/health",
           index: undefined,
           caseSensitive: undefined,
-          module: route10
+          module: route16
         },
   "routes/api.models": {
           id: "routes/api.models",
@@ -8063,7 +9271,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/models",
           index: undefined,
           caseSensitive: undefined,
-          module: route11
+          module: route17
         },
   "routes/api.update": {
           id: "routes/api.update",
@@ -8071,7 +9279,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/update",
           index: undefined,
           caseSensitive: undefined,
-          module: route12
+          module: route18
         },
   "routes/api.chat": {
           id: "routes/api.chat",
@@ -8079,7 +9287,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "api/chat",
           index: undefined,
           caseSensitive: undefined,
-          module: route13
+          module: route19
         },
   "routes/chat.$id": {
           id: "routes/chat.$id",
@@ -8087,7 +9295,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "chat/:id",
           index: undefined,
           caseSensitive: undefined,
-          module: route14
+          module: route20
+        },
+  "routes/register": {
+          id: "routes/register",
+          parentId: "root",
+          path: "register",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route21
         },
   "routes/_index": {
           id: "routes/_index",
@@ -8095,7 +9311,15 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: undefined,
           index: true,
           caseSensitive: undefined,
-          module: route15
+          module: route22
+        },
+  "routes/login": {
+          id: "routes/login",
+          parentId: "root",
+          path: "login",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route23
         },
   "routes/git": {
           id: "routes/git",
@@ -8103,7 +9327,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-la2yP4Ry.js','im
           path: "git",
           index: undefined,
           caseSensitive: undefined,
-          module: route16
+          module: route24
         }
       };
 
