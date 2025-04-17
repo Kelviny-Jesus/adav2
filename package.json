@@ -10,6 +10,7 @@
     "deploy": "npm run build && wrangler pages deploy",
     "build": "NODE_OPTIONS=\"--max-old-space-size=4096\" remix vite:build",
     "dev": "node pre-start.cjs  && remix vite:dev",
+    "dev:public": "node pre-start.cjs && remix vite:dev --host 0.0.0.0",
     "test": "vitest --run",
     "test:watch": "vitest",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint app",
