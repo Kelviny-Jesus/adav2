@@ -120,10 +120,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     // API keys fixas para OpenAI (GPT-4.1) e Anthropic (Claude 3.7)
-    const FIXED_API_KEYS: Record<string, string> = {
-      Anthropic: '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
-',
-    };
+      const FIXED_API_KEYS: Record<string, string> = {
+        Anthropic: 'api_here',
+      };
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(FIXED_API_KEYS);
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
