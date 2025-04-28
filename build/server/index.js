@@ -14,13 +14,11 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { json } from '@remix-run/cloudflare';
 import process from 'vite-plugin-node-polyfills/shims/process';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { execSync, exec } from 'child_process';
 import { generateText, streamText as streamText$1, convertToCoreMessages, createDataStream, generateId as generateId$1 } from 'ai';
 import { defaultSchema } from 'rehype-sanitize';
 import ignore from 'ignore';
 import crypto from 'crypto';
 import { json as json$1 } from '@remix-run/node';
-import { promisify } from 'util';
 import { ClientOnly } from 'remix-utils/client-only';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'react-toastify';
@@ -1399,30 +1397,15 @@ var define_PKG_DEPENDENCIES_default = { "@ai-sdk/amazon-bedrock": "1.0.6", "@ai-
 var define_PKG_DEV_DEPENDENCIES_default = { "@blitz/eslint-plugin": "0.1.0", "@cloudflare/workers-types": "^4.20241127.0", "@iconify-json/ph": "^1.2.1", "@iconify/types": "^2.0.0", "@remix-run/dev": "^2.15.2", "@testing-library/jest-dom": "^6.6.3", "@testing-library/react": "^16.2.0", "@types/diff": "^5.2.3", "@types/dom-speech-recognition": "^0.0.4", "@types/file-saver": "^2.0.7", "@types/js-cookie": "^3.0.6", "@types/path-browserify": "^1.0.3", "@types/react": "^18.3.12", "@types/react-dom": "^18.3.1", "@vitejs/plugin-react": "^4.3.4", "fast-glob": "^3.3.2", husky: "9.1.7", "is-ci": "^3.0.1", jsdom: "^26.0.0", "node-fetch": "^3.3.2", pnpm: "^9.14.4", prettier: "^3.4.1", "sass-embedded": "^1.81.0", typescript: "^5.7.2", unified: "^11.0.5", unocss: "^0.61.9", vite: "^5.4.11", "vite-plugin-node-polyfills": "^0.22.0", "vite-plugin-optimize-css-modules": "^1.1.0", "vite-tsconfig-paths": "^4.3.2", vitest: "^2.1.7", wrangler: "^3.91.0", zod: "^3.24.1" };
 var define_PKG_OPTIONAL_DEPENDENCIES_default = {};
 var define_PKG_PEER_DEPENDENCIES_default = {};
-const getGitInfo = () => {
-  try {
-    return {
-      commitHash: execSync("git rev-parse --short HEAD").toString().trim(),
-      branch: execSync("git rev-parse --abbrev-ref HEAD").toString().trim(),
-      commitTime: execSync("git log -1 --format=%cd").toString().trim(),
-      author: execSync("git log -1 --format=%an").toString().trim(),
-      email: execSync("git log -1 --format=%ae").toString().trim(),
-      remoteUrl: execSync("git config --get remote.origin.url").toString().trim(),
-      repoName: execSync("git config --get remote.origin.url").toString().trim().replace(/^.*github.com[:/]/, "").replace(/\.git$/, "")
-    };
-  } catch (error) {
-    console.error("Failed to get git info:", error);
-    return {
-      commitHash: "unknown",
-      branch: "unknown",
-      commitTime: "unknown",
-      author: "unknown",
-      email: "unknown",
-      remoteUrl: "unknown",
-      repoName: "unknown"
-    };
-  }
-};
+const getGitInfo = () => ({
+  commitHash: "unknown",
+  branch: "unknown",
+  commitTime: "unknown",
+  author: "unknown",
+  email: "unknown",
+  remoteUrl: "unknown",
+  repoName: "unknown"
+});
 const formatDependencies = (deps, type) => {
   return Object.entries(deps || {}).map(([name, version]) => ({
     name,
@@ -1433,7 +1416,7 @@ const formatDependencies = (deps, type) => {
 const getAppResponse = () => {
   const gitInfo = getGitInfo();
   return {
-    name: "bolt",
+    name: "ada",
     version: "0.0.7",
     description: "An AI Agent",
     license: "MIT",
@@ -1526,22 +1509,15 @@ const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader: loader$7
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const getLocalGitInfo = () => {
-  try {
-    return {
-      commitHash: execSync("git rev-parse HEAD").toString().trim(),
-      branch: execSync("git rev-parse --abbrev-ref HEAD").toString().trim(),
-      commitTime: execSync("git log -1 --format=%cd").toString().trim(),
-      author: execSync("git log -1 --format=%an").toString().trim(),
-      email: execSync("git log -1 --format=%ae").toString().trim(),
-      remoteUrl: execSync("git config --get remote.origin.url").toString().trim(),
-      repoName: execSync("git config --get remote.origin.url").toString().trim().replace(/^.*github.com[:/]/, "").replace(/\.git$/, "")
-    };
-  } catch (error) {
-    console.error("Failed to get local git info:", error);
-    return null;
-  }
-};
+const getLocalGitInfo = () => ({
+  commitHash: "unknown",
+  branch: "unknown",
+  commitTime: "unknown",
+  author: "unknown",
+  email: "unknown",
+  remoteUrl: "unknown",
+  repoName: "unknown"
+});
 const getGitHubInfo = async (repoFullName) => {
   try {
     const headers = {
@@ -2413,6 +2389,8 @@ You are Ada, an expert AI assistant and exceptional senior software developer wi
 
   IMPORTANT: Git is NOT available.
 
+  IMPORTANT: ALWAYS thoroughly review React or Vite projects before running them to ensure all required files are present and properly configured.
+
   IMPORTANT: WebContainer CANNOT execute diff or patch editing so always write your code in full no partial/diff update
 
   IMPORTANT: Prefer writing Node.js scripts instead of shell scripts. The environment doesn't fully support shell scripts, so use Node.js for scripting tasks whenever possible!
@@ -2508,6 +2486,12 @@ You are Ada, an expert AI assistant and exceptional senior software developer wi
      - Check for inefficient patterns or anti-patterns
      - Verify proper error handling
   
+  5. React and Vite Projects:
+     - Verify all required configuration files are present (vite.config.js, index.html)
+     - Check that all necessary dependencies are included in package.json
+     - Ensure proper component structure and file organization
+     - Verify entry points and imports are correctly configured
+  
   Only after completing this review should you proceed with executing or suggesting the execution of code. If issues are found, fix them before proceeding.
 </code_review_instructions>
 
@@ -2551,8 +2535,9 @@ You are Ada, an expert AI assistant and exceptional senior software developer wi
       - file: For writing new files or updating existing files. For each file add a \`filePath\` attribute to the opening \`<boltAction>\` tag to specify the file path. The content of the file artifact is the file contents. All file paths MUST BE relative to the current working directory.
 
       - start: For starting a development server.
-        - Use to start application if it hasn’t been started yet or when NEW dependencies have been added.
+        - Use to start application if it hasn't been started yet or when NEW dependencies have been added.
         - Only use this action when you need to run a dev server or start the application
+        - ULTRA IMPORTANT: For React or Vite projects, ALWAYS thoroughly review the project structure and files before starting the server to ensure all required files are present and properly configured
         - ULTRA IMPORTANT: do NOT re-run a dev server if files are updated. The existing dev server can automatically detect changes and executes the file changes
 
 
@@ -2703,6 +2688,7 @@ You are Ada, an expert AI assistant and exceptional senior software developer wi
   - Use Vite for web servers
   - Databases: prefer libsql, sqlite, or non-native solutions
   - When for react dont forget to write vite config and index.html to the project
+  - ALWAYS thoroughly review React or Vite projects before running them to ensure all required files are present and properly configured
   - WebContainer CANNOT execute diff or patch editing so always write your code in full no partial/diff update
 
   Available shell commands: cat, cp, ls, mkdir, mv, rm, rmdir, touch, hostname, ps, pwd, uptime, env, node, python3, code, jq, curl, head, sort, tail, clear, which, export, chmod, scho, kill, ln, xxd, alias, getconf, loadenv, wasm, xdg-open, command, exit, source
@@ -3848,448 +3834,9 @@ const route16 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader: loader$3
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const execAsync = promisify(exec);
-const action$3 = async ({ request }) => {
-  if (request.method !== "POST") {
-    return json$1({ error: "Method not allowed" }, { status: 405 });
-  }
-  try {
-    const body = await request.json();
-    if (!body || typeof body !== "object" || !("branch" in body) || typeof body.branch !== "string") {
-      return json$1({ error: "Invalid request body: branch is required and must be a string" }, { status: 400 });
-    }
-    const { branch, autoUpdate = false } = body;
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        const sendProgress = (update) => {
-          controller.enqueue(encoder.encode(JSON.stringify(update) + "\n"));
-        };
-        try {
-          sendProgress({
-            stage: "fetch",
-            message: "Checking repository status...",
-            progress: 0
-          });
-          let defaultBranch = branch || "main";
-          try {
-            await execAsync("git remote get-url upstream");
-            sendProgress({
-              stage: "fetch",
-              message: "Repository remote verified",
-              progress: 10
-            });
-          } catch {
-            throw new Error(
-              "No upstream repository found. Please set up the upstream repository first by running:\ngit remote add upstream https://github.com/stackblitz-labs/bolt.diy.git"
-            );
-          }
-          if (!branch) {
-            sendProgress({
-              stage: "fetch",
-              message: "Detecting default branch...",
-              progress: 20
-            });
-            try {
-              const { stdout } = await execAsync('git remote show upstream | grep "HEAD branch" | cut -d" " -f5');
-              defaultBranch = stdout.trim() || "main";
-              sendProgress({
-                stage: "fetch",
-                message: `Using branch: ${defaultBranch}`,
-                progress: 30
-              });
-            } catch {
-              defaultBranch = "main";
-              sendProgress({
-                stage: "fetch",
-                message: "Using default branch: main",
-                progress: 30
-              });
-            }
-          }
-          sendProgress({
-            stage: "fetch",
-            message: "Fetching latest changes...",
-            progress: 40
-          });
-          await execAsync("git fetch --all");
-          sendProgress({
-            stage: "fetch",
-            message: "Remote changes fetched",
-            progress: 50
-          });
-          try {
-            await execAsync(`git rev-parse --verify upstream/${defaultBranch}`);
-            sendProgress({
-              stage: "fetch",
-              message: "Remote branch verified",
-              progress: 60
-            });
-          } catch {
-            throw new Error(
-              `Remote branch 'upstream/${defaultBranch}' not found. Please ensure the upstream repository is properly configured.`
-            );
-          }
-          sendProgress({
-            stage: "fetch",
-            message: "Comparing versions...",
-            progress: 70
-          });
-          const { stdout: currentCommit } = await execAsync("git rev-parse HEAD");
-          const { stdout: remoteCommit } = await execAsync(`git rev-parse upstream/${defaultBranch}`);
-          if (currentCommit.trim() === remoteCommit.trim()) {
-            sendProgress({
-              stage: "complete",
-              message: "No updates available. You are on the latest version.",
-              progress: 100,
-              details: {
-                currentCommit: currentCommit.trim().substring(0, 7),
-                remoteCommit: remoteCommit.trim().substring(0, 7)
-              }
-            });
-            return;
-          }
-          sendProgress({
-            stage: "fetch",
-            message: "Analyzing changes...",
-            progress: 80
-          });
-          let changedFiles = [];
-          let commitMessages = [];
-          let stats = null;
-          let totalSizeInBytes = 0;
-          const formatSize = (bytes) => {
-            if (bytes === 0) {
-              return "0 B";
-            }
-            const k = 1024;
-            const sizes = ["B", "KB", "MB", "GB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-          };
-          try {
-            const { stdout: diffOutput } = await execAsync(
-              `git diff --name-status ${currentCommit.trim()}..${remoteCommit.trim()}`
-            );
-            const files = diffOutput.split("\n").filter(Boolean);
-            if (files.length === 0) {
-              sendProgress({
-                stage: "complete",
-                message: `No file changes detected between your version and upstream/${defaultBranch}. You might be on a different branch.`,
-                progress: 100,
-                details: {
-                  currentCommit: currentCommit.trim().substring(0, 7),
-                  remoteCommit: remoteCommit.trim().substring(0, 7)
-                }
-              });
-              return;
-            }
-            sendProgress({
-              stage: "fetch",
-              message: `Found ${files.length} changed files, calculating sizes...`,
-              progress: 90
-            });
-            for (const line of files) {
-              const [status, file] = line.split("	");
-              if (status !== "D") {
-                try {
-                  const { stdout: sizeOutput } = await execAsync(`git cat-file -s ${remoteCommit.trim()}:${file}`);
-                  const size = parseInt(sizeOutput) || 0;
-                  totalSizeInBytes += size;
-                } catch {
-                  console.debug(`Could not get size for file: ${file}`);
-                }
-              }
-            }
-            changedFiles = files.map((line) => {
-              const [status, file] = line.split("	");
-              return `${status === "M" ? "Modified" : status === "A" ? "Added" : "Deleted"}: ${file}`;
-            });
-          } catch (err) {
-            console.debug("Failed to get changed files:", err);
-            throw new Error(`Failed to compare changes with upstream/${defaultBranch}. Are you on the correct branch?`);
-          }
-          try {
-            const { stdout: logOutput } = await execAsync(
-              `git log --pretty=format:"%h|%s|%aI" ${currentCommit.trim()}..${remoteCommit.trim()}`
-            );
-            const commits = logOutput.split("\n").filter(Boolean).map((line) => {
-              const [hash, subject, timestamp] = line.split("|");
-              let type = "other";
-              let message = subject;
-              if (subject.startsWith("feat:") || subject.startsWith("feature:")) {
-                type = "feature";
-                message = subject.replace(/^feat(?:ure)?:/, "").trim();
-              } else if (subject.startsWith("fix:")) {
-                type = "fix";
-                message = subject.replace(/^fix:/, "").trim();
-              } else if (subject.startsWith("docs:")) {
-                type = "docs";
-                message = subject.replace(/^docs:/, "").trim();
-              } else if (subject.startsWith("style:")) {
-                type = "style";
-                message = subject.replace(/^style:/, "").trim();
-              } else if (subject.startsWith("refactor:")) {
-                type = "refactor";
-                message = subject.replace(/^refactor:/, "").trim();
-              } else if (subject.startsWith("perf:")) {
-                type = "perf";
-                message = subject.replace(/^perf:/, "").trim();
-              } else if (subject.startsWith("test:")) {
-                type = "test";
-                message = subject.replace(/^test:/, "").trim();
-              } else if (subject.startsWith("build:")) {
-                type = "build";
-                message = subject.replace(/^build:/, "").trim();
-              } else if (subject.startsWith("ci:")) {
-                type = "ci";
-                message = subject.replace(/^ci:/, "").trim();
-              }
-              return {
-                hash,
-                type,
-                message,
-                timestamp: new Date(timestamp)
-              };
-            });
-            const groupedCommits = commits.reduce(
-              (acc, commit) => {
-                if (!acc[commit.type]) {
-                  acc[commit.type] = [];
-                }
-                acc[commit.type].push(commit);
-                return acc;
-              },
-              {}
-            );
-            const formattedMessages = Object.entries(groupedCommits).map(([type, commits2]) => {
-              const emoji = {
-                feature: "✨",
-                fix: "🐛",
-                docs: "📚",
-                style: "💎",
-                refactor: "♻️",
-                perf: "⚡",
-                test: "🧪",
-                build: "🛠️",
-                ci: "⚙️",
-                other: "🔍"
-              }[type];
-              const title = {
-                feature: "Features",
-                fix: "Bug Fixes",
-                docs: "Documentation",
-                style: "Styles",
-                refactor: "Code Refactoring",
-                perf: "Performance",
-                test: "Tests",
-                build: "Build",
-                ci: "CI",
-                other: "Other Changes"
-              }[type];
-              return `### ${emoji} ${title}
-
-${commits2.map((c) => `* ${c.message} (${c.hash.substring(0, 7)}) - ${c.timestamp.toLocaleString()}`).join("\n")}`;
-            });
-            commitMessages = formattedMessages;
-          } catch {
-          }
-          try {
-            const { stdout: diffStats } = await execAsync(
-              `git diff --shortstat ${currentCommit.trim()}..${remoteCommit.trim()}`
-            );
-            stats = diffStats.match(
-              /(\d+) files? changed(?:, (\d+) insertions?\\(\\+\\))?(?:, (\d+) deletions?\\(-\\))?/
-            );
-          } catch {
-          }
-          if (!stats && changedFiles.length === 0) {
-            sendProgress({
-              stage: "complete",
-              message: `No changes detected between your version and upstream/${defaultBranch}. This might be unexpected - please check your git status.`,
-              progress: 100
-            });
-            return;
-          }
-          sendProgress({
-            stage: "fetch",
-            message: "Fetching changelog...",
-            progress: 95
-          });
-          const changelog = await fetchChangelog(currentCommit.trim(), remoteCommit.trim());
-          sendProgress({
-            stage: "fetch",
-            message: `Changes detected on upstream/${defaultBranch}`,
-            progress: 100,
-            details: {
-              changedFiles,
-              additions: stats?.[2] ? parseInt(stats[2]) : 0,
-              deletions: stats?.[3] ? parseInt(stats[3]) : 0,
-              commitMessages,
-              totalSize: formatSize(totalSizeInBytes),
-              currentCommit: currentCommit.trim().substring(0, 7),
-              remoteCommit: remoteCommit.trim().substring(0, 7),
-              updateReady: true,
-              changelog,
-              compareUrl: `https://github.com/stackblitz-labs/bolt.diy/compare/${currentCommit.trim().substring(0, 7)}...${remoteCommit.trim().substring(0, 7)}`
-            }
-          });
-          if (!autoUpdate) {
-            sendProgress({
-              stage: "complete",
-              message: 'Update is ready to be applied. Click "Update Now" to proceed.',
-              progress: 100,
-              details: {
-                changedFiles,
-                additions: stats?.[2] ? parseInt(stats[2]) : 0,
-                deletions: stats?.[3] ? parseInt(stats[3]) : 0,
-                commitMessages,
-                totalSize: formatSize(totalSizeInBytes),
-                currentCommit: currentCommit.trim().substring(0, 7),
-                remoteCommit: remoteCommit.trim().substring(0, 7),
-                updateReady: true,
-                changelog,
-                compareUrl: `https://github.com/stackblitz-labs/bolt.diy/compare/${currentCommit.trim().substring(0, 7)}...${remoteCommit.trim().substring(0, 7)}`
-              }
-            });
-            return;
-          }
-          sendProgress({
-            stage: "pull",
-            message: `Pulling changes from upstream/${defaultBranch}...`,
-            progress: 0
-          });
-          await execAsync(`git pull upstream ${defaultBranch}`);
-          sendProgress({
-            stage: "pull",
-            message: "Changes pulled successfully",
-            progress: 100
-          });
-          sendProgress({
-            stage: "install",
-            message: "Installing dependencies...",
-            progress: 0
-          });
-          await execAsync("pnpm install");
-          sendProgress({
-            stage: "install",
-            message: "Dependencies installed successfully",
-            progress: 100
-          });
-          sendProgress({
-            stage: "build",
-            message: "Building application...",
-            progress: 0
-          });
-          await execAsync("pnpm build");
-          sendProgress({
-            stage: "build",
-            message: "Build completed successfully",
-            progress: 100
-          });
-          sendProgress({
-            stage: "complete",
-            message: "Update completed successfully! Click Restart to apply changes.",
-            progress: 100
-          });
-        } catch (err) {
-          sendProgress({
-            stage: "complete",
-            message: "Update failed",
-            error: err instanceof Error ? err.message : "Unknown error occurred"
-          });
-        } finally {
-          controller.close();
-        }
-      }
-    });
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive"
-      }
-    });
-  } catch (err) {
-    console.error("Update preparation failed:", err);
-    return json$1(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : "Unknown error occurred while preparing update"
-      },
-      { status: 500 }
-    );
-  }
+const action$3 = async () => {
+  return json$1({ error: "Not available in this environment." }, { status: 501 });
 };
-async function fetchChangelog(currentCommit, remoteCommit) {
-  try {
-    const { stdout: changelogContent } = await execAsync("git show upstream/main:changelog.md");
-    if (changelogContent) {
-      return changelogContent;
-    }
-    let changelog = "# Changes in this Update\n\n";
-    const { stdout: commitLog } = await execAsync(
-      `git log --pretty=format:"%h|%s|%b" ${currentCommit.trim()}..${remoteCommit.trim()}`
-    );
-    const commits = commitLog.split("\n").filter(Boolean);
-    const categorizedCommits = {
-      "✨ Features": [],
-      "🐛 Bug Fixes": [],
-      "📚 Documentation": [],
-      "💎 Styles": [],
-      "♻️ Code Refactoring": [],
-      "⚡ Performance": [],
-      "🧪 Tests": [],
-      "🛠️ Build": [],
-      "⚙️ CI": [],
-      "🔍 Other Changes": []
-    };
-    for (const commit of commits) {
-      const [hash, subject] = commit.split("|");
-      let category = "🔍 Other Changes";
-      if (subject.startsWith("feat:") || subject.startsWith("feature:")) {
-        category = "✨ Features";
-      } else if (subject.startsWith("fix:")) {
-        category = "🐛 Bug Fixes";
-      } else if (subject.startsWith("docs:")) {
-        category = "📚 Documentation";
-      } else if (subject.startsWith("style:")) {
-        category = "💎 Styles";
-      } else if (subject.startsWith("refactor:")) {
-        category = "♻️ Code Refactoring";
-      } else if (subject.startsWith("perf:")) {
-        category = "⚡ Performance";
-      } else if (subject.startsWith("test:")) {
-        category = "🧪 Tests";
-      } else if (subject.startsWith("build:")) {
-        category = "🛠️ Build";
-      } else if (subject.startsWith("ci:")) {
-        category = "⚙️ CI";
-      }
-      const message = subject.includes(":") ? subject.split(":")[1].trim() : subject.trim();
-      categorizedCommits[category].push(`* ${message} (${hash.substring(0, 7)})`);
-    }
-    for (const [category, commits2] of Object.entries(categorizedCommits)) {
-      if (commits2.length > 0) {
-        changelog += `
-## ${category}
-
-${commits2.join("\n")}
-`;
-      }
-    }
-    const { stdout: stats } = await execAsync(`git diff --shortstat ${currentCommit.trim()}..${remoteCommit.trim()}`);
-    if (stats) {
-      changelog += "\n## 📊 Stats\n\n";
-      changelog += `${stats.trim()}
-`;
-    }
-    return changelog;
-  } catch (error) {
-    console.error("Error fetching changelog:", error);
-    return "Unable to fetch changelog";
-  }
-}
 
 const route18 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
@@ -9115,7 +8662,7 @@ const route24 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   meta
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const serverManifest = {'entry':{'module':'/assets/entry.client-BabmRpnX.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-DuP4VvNN.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js'],'css':['/assets/root-at6U2ugR.css']},'routes/webcontainer.preview.$id':{'id':'routes/webcontainer.preview.$id','parentId':'root','path':'webcontainer/preview/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webcontainer.preview._id-BbnY2N0U.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/reset-code-verification':{'id':'routes/reset-code-verification','parentId':'root','path':'reset-code-verification','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/reset-code-verification-CMRqDZVK.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/api.supabase.variables':{'id':'routes/api.supabase.variables','parentId':'routes/api.supabase','path':'variables','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.variables-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models.$provider':{'id':'routes/api.models.$provider','parentId':'routes/api.models','path':':provider','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models._provider-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.app-info':{'id':'routes/api.system.app-info','parentId':'root','path':'api/system/app-info','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.app-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.git-info':{'id':'routes/api.system.git-info','parentId':'root','path':'api/system/git-info','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.git-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase.query':{'id':'routes/api.supabase.query','parentId':'routes/api.supabase','path':'query','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.query-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.check-env-key':{'id':'routes/api.check-env-key','parentId':'root','path':'api/check-env-key','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.check-env-key-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.git-proxy.$':{'id':'routes/api.git-proxy.$','parentId':'root','path':'api/git-proxy/*','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.git-proxy._-l0sNRNKZ.js','imports':[],'css':[]},'routes/forgot-password':{'id':'routes/forgot-password','parentId':'root','path':'forgot-password','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/forgot-password-B-fSjVHM.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js'],'css':[]},'routes/api.enhancer':{'id':'routes/api.enhancer','parentId':'root','path':'api/enhancer','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.enhancer-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase':{'id':'routes/api.supabase','parentId':'root','path':'api/supabase','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.llmcall':{'id':'routes/api.llmcall','parentId':'root','path':'api/llmcall','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.llmcall-l0sNRNKZ.js','imports':[],'css':[]},'routes/verify-code':{'id':'routes/verify-code','parentId':'root','path':'verify-code','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/verify-code-CdHEsbVd.js','imports':['/assets/index-5yin8JJm.js'],'css':[]},'routes/api.deploy':{'id':'routes/api.deploy','parentId':'root','path':'api/deploy','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.deploy-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.health':{'id':'routes/api.health','parentId':'root','path':'api/health','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.health-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models':{'id':'routes/api.models','parentId':'root','path':'api/models','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.update':{'id':'routes/api.update','parentId':'root','path':'api/update','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.update-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.chat':{'id':'routes/api.chat','parentId':'root','path':'api/chat','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.chat-l0sNRNKZ.js','imports':[],'css':[]},'routes/chat.$id':{'id':'routes/chat.$id','parentId':'root','path':'chat/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/chat._id-B5PdbjnJ.js','imports':['/assets/_index-Cm-XOKdI.js','/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/register':{'id':'routes/register','parentId':'root','path':'register','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/register-D2itDNk2.js','imports':['/assets/index-5yin8JJm.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js','/assets/index-DgoachrA.js'],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-Cm-XOKdI.js','imports':['/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']},'routes/login':{'id':'routes/login','parentId':'root','path':'login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/login-DabtSAtB.js','imports':['/assets/index-5yin8JJm.js','/assets/components-Bwa7pH9e.js','/assets/profile-BYW5p1bK.js','/assets/index-DgoachrA.js'],'css':[]},'routes/git':{'id':'routes/git','parentId':'root','path':'git','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/git-DD9We-VH.js','imports':['/assets/index-5yin8JJm.js','/assets/Header-1b8WMRn_.js','/assets/index-DLS6jNab.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-Bwa7pH9e.js'],'css':['/assets/Header-DeXKFCkm.css']}},'url':'/assets/manifest-3ef41297.js','version':'3ef41297'};
+const serverManifest = {'entry':{'module':'/assets/entry.client-C7-M-CS0.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-CL6FcWz9.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js','/assets/index-BoFGafk4.js','/assets/index-DgoachrA.js'],'css':['/assets/root-at6U2ugR.css']},'routes/webcontainer.preview.$id':{'id':'routes/webcontainer.preview.$id','parentId':'root','path':'webcontainer/preview/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webcontainer.preview._id-WqT1lCio.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js'],'css':[]},'routes/reset-code-verification':{'id':'routes/reset-code-verification','parentId':'root','path':'reset-code-verification','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/reset-code-verification-DzNlk2IF.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js'],'css':[]},'routes/api.supabase.variables':{'id':'routes/api.supabase.variables','parentId':'routes/api.supabase','path':'variables','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.variables-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models.$provider':{'id':'routes/api.models.$provider','parentId':'routes/api.models','path':':provider','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models._provider-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.app-info':{'id':'routes/api.system.app-info','parentId':'root','path':'api/system/app-info','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.app-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.system.git-info':{'id':'routes/api.system.git-info','parentId':'root','path':'api/system/git-info','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.system.git-info-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase.query':{'id':'routes/api.supabase.query','parentId':'routes/api.supabase','path':'query','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase.query-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.check-env-key':{'id':'routes/api.check-env-key','parentId':'root','path':'api/check-env-key','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.check-env-key-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.git-proxy.$':{'id':'routes/api.git-proxy.$','parentId':'root','path':'api/git-proxy/*','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.git-proxy._-l0sNRNKZ.js','imports':[],'css':[]},'routes/forgot-password':{'id':'routes/forgot-password','parentId':'root','path':'forgot-password','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/forgot-password-DMfCBzsO.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js'],'css':[]},'routes/api.enhancer':{'id':'routes/api.enhancer','parentId':'root','path':'api/enhancer','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.enhancer-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.supabase':{'id':'routes/api.supabase','parentId':'root','path':'api/supabase','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.supabase-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.llmcall':{'id':'routes/api.llmcall','parentId':'root','path':'api/llmcall','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.llmcall-l0sNRNKZ.js','imports':[],'css':[]},'routes/verify-code':{'id':'routes/verify-code','parentId':'root','path':'verify-code','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/verify-code-yjgAd3GG.js','imports':['/assets/index-4MufcReh.js'],'css':[]},'routes/api.deploy':{'id':'routes/api.deploy','parentId':'root','path':'api/deploy','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.deploy-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.health':{'id':'routes/api.health','parentId':'root','path':'api/health','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.health-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.models':{'id':'routes/api.models','parentId':'root','path':'api/models','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.models-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.update':{'id':'routes/api.update','parentId':'root','path':'api/update','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.update-l0sNRNKZ.js','imports':[],'css':[]},'routes/api.chat':{'id':'routes/api.chat','parentId':'root','path':'api/chat','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.chat-l0sNRNKZ.js','imports':[],'css':[]},'routes/chat.$id':{'id':'routes/chat.$id','parentId':'root','path':'chat/:id','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/chat._id-D0S7Prxb.js','imports':['/assets/_index-DSUU3Kg2.js','/assets/index-4MufcReh.js','/assets/Header-XJOY0Kwv.js','/assets/index-BoFGafk4.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-ki2z-XRs.js'],'css':['/assets/Header-CI-kvXcR.css']},'routes/register':{'id':'routes/register','parentId':'root','path':'register','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/register-DEIABTFe.js','imports':['/assets/index-4MufcReh.js','/assets/profile-BYW5p1bK.js','/assets/components-ki2z-XRs.js','/assets/index-DgoachrA.js'],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-DSUU3Kg2.js','imports':['/assets/index-4MufcReh.js','/assets/Header-XJOY0Kwv.js','/assets/index-BoFGafk4.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-ki2z-XRs.js'],'css':['/assets/Header-CI-kvXcR.css']},'routes/login':{'id':'routes/login','parentId':'root','path':'login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/login-Bi5mdEmO.js','imports':['/assets/index-4MufcReh.js','/assets/components-ki2z-XRs.js','/assets/profile-BYW5p1bK.js','/assets/index-DgoachrA.js'],'css':[]},'routes/git':{'id':'routes/git','parentId':'root','path':'git','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/git-ClXKM994.js','imports':['/assets/index-4MufcReh.js','/assets/Header-XJOY0Kwv.js','/assets/index-BoFGafk4.js','/assets/index-DgoachrA.js','/assets/profile-BYW5p1bK.js','/assets/components-ki2z-XRs.js'],'css':['/assets/Header-CI-kvXcR.css']}},'url':'/assets/manifest-05fd76ae.js','version':'05fd76ae'};
 
 /**
        * `mode` is only relevant for the old Remix compiler but

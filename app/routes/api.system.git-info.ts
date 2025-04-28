@@ -1,6 +1,6 @@
 import type { LoaderFunction } from '@remix-run/cloudflare';
 import { json } from '@remix-run/cloudflare';
-import { execSync } from 'child_process';
+// import { execSync } from 'child_process';
 
 interface GitHubRepoInfo {
   name: string;
@@ -17,26 +17,15 @@ interface GitHubRepoInfo {
   };
 }
 
-const getLocalGitInfo = () => {
-  try {
-    return {
-      commitHash: execSync('git rev-parse HEAD').toString().trim(),
-      branch: execSync('git rev-parse --abbrev-ref HEAD').toString().trim(),
-      commitTime: execSync('git log -1 --format=%cd').toString().trim(),
-      author: execSync('git log -1 --format=%an').toString().trim(),
-      email: execSync('git log -1 --format=%ae').toString().trim(),
-      remoteUrl: execSync('git config --get remote.origin.url').toString().trim(),
-      repoName: execSync('git config --get remote.origin.url')
-        .toString()
-        .trim()
-        .replace(/^.*github.com[:/]/, '')
-        .replace(/\.git$/, ''),
-    };
-  } catch (error) {
-    console.error('Failed to get local git info:', error);
-    return null;
-  }
-};
+const getLocalGitInfo = () => ({
+  commitHash: 'unknown',
+  branch: 'unknown',
+  commitTime: 'unknown',
+  author: 'unknown',
+  email: 'unknown',
+  remoteUrl: 'unknown',
+  repoName: 'unknown',
+});
 
 const getGitHubInfo = async (repoFullName: string) => {
   try {
